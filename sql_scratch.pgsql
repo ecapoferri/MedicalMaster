@@ -126,7 +126,7 @@ SELECT
     m.callerid,
     m.acct,
     m.ext,
-    m.call_type,
+    m.call_for_ad,
     m.practice_id,
     m.zipcode,
     m.connected,
@@ -175,6 +175,8 @@ SELECT
    m.acct AS af_acct,
    m.practice_id AS practice_id,
    p.number_term AS att_fwd,
+   ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.recording_id)), NULL)
+        AS af_ids,
     COUNT(p.connected) AS att_connections,
     CASE WHEN COUNT(m.connected)::INTEGER = 0
         THEN NULL
@@ -184,11 +186,9 @@ SELECT
     ARRAY_AGG(p.duration) AS att_durations,
     ARRAY_REMOVE(ARRAY_AGG(DISTINCT(p.id)), NULL)
         AS att_ids,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.recording_id)), NULL)
-        AS af_ids,
     CASE WHEN m.callerid IS NOT NULL
-        THEN ARRAY_REPLACE(ARRAY_AGG(m.call_type), NULL, FALSE)::BOOLEAN[]
-        ELSE ARRAY_REMOVE(ARRAY_AGG(m.call_type), NULL)::BOOLEAN[]
+        THEN ARRAY_REPLACE(ARRAY_AGG(m.call_for_ad), NULL, FALSE)::BOOLEAN[]
+        ELSE ARRAY_REMOVE(ARRAY_AGG(m.call_for_ad), NULL)::BOOLEAN[]
         END
         AS af_typed,
     ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.besttime)), NULL)
@@ -215,4 +215,15 @@ GROUP BY
     af_acct,
     practice_id,
     att_fwd
+;
+
+
+SELECT * FROM af_message_data ORDER BY acct;
+
+-- SELECT test @> ARRAY[TRUE], ver FROM
+-- (
+    SELECT ARRAY[TRUE, FALSE, FALSE] @> ARRAY[TRUE] test, ARRAY[TRUE, FALSE, FALSE] ver
+    UNION
+    SELECT ARRAY[FALSE, FALSE, FALSE] @> ARRAY[TRUE] test, ARRAY[FALSE, FALSE, FALSE] ver
+-- ) as xx
 ;

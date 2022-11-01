@@ -116,7 +116,7 @@ af_fields = {
         orig='Caller ID',
         dtype=BIGINT
     ),
-    'call_type': FldCfg(
+    'call_for_ad': FldCfg(
         orig='CallType',
         dtype=BOOLEAN
     ),
@@ -191,7 +191,7 @@ af_cfgs = TblCfg(
     other_={
         'filter_fld': 'connected',
         'remap': {
-            'call_type': {
+            'call_for_ad': {
                 'Yes': True,
                 'No': False
             }
