@@ -61,10 +61,14 @@ SELECT
         af_msg_given_emails,
     NULLIF(array_remove(array_agg(DISTINCT(m.addr_state)), NULL), '{}')
         af_msg_given_addr_state,
-    NULLIF(array_remove(array_agg(DISTINCT(m.addr_state)), NULL), '{}')
-        af_msg_given_addr_stateDA,
     NULLIF(array_remove(array_agg(m.reference), NULL), '{}')
-        af_msg_bodies
+        af_msg_bodies,
+    array_agg(m.dispo)
+        af_dispos,
+    array_agg(m.history)
+        af_hists
+
+
 FROM
     p FULL OUTER JOIN m
     on m.callerid =  p.number_orig

@@ -18,13 +18,13 @@ fields: list[str] = att_cfgs['field_stmts']
 
 df_query_fields: str = ',\n'.join(fields)
 
-df_query: str = """
+df_query: str = """--sql
         SELECT {f}
         FROM att_inbound
         WHERE connected > '{d}'
         ORDER BY connected DESC
         ;
-    """
+    """.replace('--sql\n', '')
 
 # ==============================
 q_date_fmt: str = r'%Y-%M-%d'

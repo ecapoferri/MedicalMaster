@@ -71,7 +71,7 @@ class TblCfg(TypedDict):
 
 
 #== TABLE CONFIGS ==================>
-trailing_days: int = 31
+trailing_days: int = 10
 
 vntge_vw_sql = """
         CREATE OR REPLACE VIEW {nm} AS
@@ -179,6 +179,14 @@ af_fields = {
     'acct': FldCfg(
         dtype=INTEGER,
         orig=None
+    ),
+    'dispo': FldCfg(
+        dtype=TEXT,
+        orig='_DISPOSITION'
+    ),
+    'history': FldCfg(
+        dtype=TEXT,
+        orig='History'
     )
 }
 af_cfgs = TblCfg(

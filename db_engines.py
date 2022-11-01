@@ -24,6 +24,7 @@ wh_un = environ['PRMDIA_POSTGRES_CONT_UN']
 wh_pw = environ['PRMDIA_POSTGRES_CONT_PW']
 wh_host = environ['PRMDIA_POSTGRES_CONT_HOST']
 wh_db_name = environ['PRMDIA_POSTGRES_CONT_MM_DB']
+wh_db_name_rprt = environ['PRMDIA_POSTGRES_CONT_RPRT_DB']
 #<==Destination WH DB Connection config/s=========================<
 
 #MMS/WO=MySQL config/s================================>
@@ -36,8 +37,16 @@ mms_db_name = environ['PRMDIA_SRVR_MMS_DB']
 
 #==Connection Engines=============================>
 # connection to wh db
-wh_conn_str: str = f"postgresql://{wh_un}:{wh_pw}@{wh_host}:{wh_port}/{wh_db_name}"
-wh_db: Engine = create_engine(wh_conn_str)
+wh_conn_str, wh_conn_str_rprt = (
+        f"postgresql://{wh_un}:{wh_pw}@{wh_host}:{wh_port}/{n}"
+        for n in (wh_db_name, wh_db_name_rprt)
+    )
+wh_db: Engine
+rprt_db: Engine
+wh_db, rprt_db = (
+        create_engine(s) for s in
+        (wh_conn_str, wh_conn_str_rprt)
+    )
 # connections to primedia dbs
 mms_conn_str = f"mysql+mysqldb://{mmswo_un}:{mmswo_pw}@{mmswo_host}:{mmswo_port}/{mms_db_name}"
 mms_db = create_engine(mms_conn_str)
