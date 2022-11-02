@@ -102,7 +102,8 @@ def check_connection(db_: Engine):
         db_ (Engine): sqlalchemy connection engine to check
 
     Raises:
-        Exception: Try/Except excepts MySQLdb._exceptions.OperationalError (asliased as 'MySQL_OpErr'). Raises basic exception to stop execution if that's the case.
+        Exception: Try/Except excepts MySQLdb._exceptions.OperationalError
+            (asliased as 'MySQL_OpErr'). Raises basic exception to stop execution if that's the case.
     """
     with db_.connect() as conn:
         try:
