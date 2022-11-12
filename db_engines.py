@@ -6,6 +6,7 @@ from sqlalchemy.engine.base import Engine  # for type hints
 from MySQLdb._exceptions import OperationalError as MySQL_OpErr
 
 import traceback
+from logging import getLogger, Logger, info, debug, error
 
 from os import environ
 from dotenv import load_dotenv
@@ -34,6 +35,8 @@ mmswo_port = environ['PRMDIA_SRVR_DB_PORT']
 mmswo_host = environ['PRMDIA_SRVR_DB_HOST']
 mms_db_name = environ['PRMDIA_SRVR_MMS_DB']
 #<==MMS/WO=MySQL config/s=========================<
+
+logger = getLogger(environ['PRMDIA_MM_LOGNAME'])
 
 #==Connection Engines=============================>
 # connection to wh db
@@ -107,16 +110,12 @@ def check_connection(db_: Engine):
     """
     with db_.connect() as conn:
         try:
-            print(f"Checking {db_.engine} -->")
+            logger.info(f"Checking {db_.engine} -->")
             rows: list[Row] = conn.execute(
                 "SELECT 'Hello There' AS greeting;").all()
             rows_str: list[str] = [f"\t{r}" for r in rows]
-            print(
-                *rows_str,
-                sep='\n',
-                end='\n'
-            )
-            print(f"--> \x1b[32m{db_.engine} \x1b[1m✔️\x1b[0m\n")
+            logger.info('\n'.join(rows_str))
+            logger.info(f"--> \x1b[32m{db_.engine} \x1b[1m✔️\x1b[0m\n")
         except MySQL_OpErr:
             raise Exception(
                 f"\x1b[91mLooks Like a problem with your connection to {db_.name};\x1b[0m\nSee below:\n\n{traceback.format_exc()}\n"

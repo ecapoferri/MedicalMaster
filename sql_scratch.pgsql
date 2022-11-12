@@ -1,229 +1,78 @@
-SELECT *
-FROM
-        att_data AS p
-    FULL OUTER JOIN
-        af_message_data AS m
-    ON p.number_orig = m.callerid
+CREATE OR REPLACE VIEW med_master_join AS
+SELECT
+   p.number_orig att_callerid,
+   m.callerid af_callerid,
+
+   p.number_dial att_toll,
+   p.acct_af att_acct_af,
+   m.acct af_acct,
+
+    NULLIF(array_remove(array_agg(DISTINCT(m.recording_id)), NULL), '{}')
+        af_ids,
+    -- COALESCES TO TRUE IF ANY WERE TRUE
+    CASE WHEN NULLIF(COUNT(m.connected), 0) IS NOT NULL
+        THEN ARRAY_REPLACE(array_agg(m.call_for_ad), NULL, FALSE) @> ARRAY[TRUE]
+        ELSE NULL
+        END
+        AS call_for_ad,
+
+   m.practice_id af_practice_id,
+   m.client af_client,
+    NULLIF(array_remove(array_agg(m.dispo), NULL), '{}')
+        af_dispos,
+    NULLIF(array_remove(array_agg(m.reference), NULL), '{}')
+        af_msg_bodies,
+    NULLIF(array_remove(array_agg(m.history), NULL), '{}')
+        af_hists,
+
+    NULLIF(array_remove(array_agg(DISTINCT(p.state)), NULL), '{}')
+        att_state_agg,
+    NULLIF(array_remove(array_agg(DISTINCT(m.addr_state)), NULL), '{}')
+        af_msg_given_addr_state,
+
+    -- the rest are just lists of existing results
+    NULLIF(array_remove(array_agg(DISTINCT(m.besttime)), NULL), '{}')
+        af_msg_besttimes,
+    NULLIF(array_remove(array_agg(m.sent_emails_to), NULL), '{}')
+        af_msg_emailed,
+    NULLIF(array_remove(array_agg(DISTINCT(m.caller_name)), NULL), '{}')
+        af_msg_caller_name,
+    NULLIF(array_remove(array_agg(DISTINCT(m.phone)), NULL), '{}')
+        af_msg_given_phones,
+    NULLIF(array_remove(array_agg(DISTINCT(m.email)), NULL), '{}')
+        af_msg_given_emails,
+
+
+    SUM(duration) durations_sum,
+   p.connected::DATE att_date,
+    MIN(p.connected) att_connected,
+    -- NULLIF(array_remove(array_agg(DISTINCT(p.connected)), NULL), '{}')
+    --     att_connected,
+   m.connected::DATE af_date,
+    MIN(m.connected) af_connected
+
+
+
+FROM att_data p FULL OUTER JOIN af_message_data m
+    -- JOIN BY COMMON caller id, destination acct, date of call (CDT/CST CONVERTED FROM UTC)
+    ON
+    p.number_orig = m.callerid
+    AND
+    p.acct_af = m.acct
+    AND
+    p.connected::DATE = m.connected::DATE
+
 WHERE
-        p.connected >= '2022-10-20'
-    AND
-        p.connected < '2022-10-21'
-    AND
-        m.connected >= '2022-10-20'
-    AND
-        m.connected < '2022-10-21'
-LIMIT 100;
-
-WITH
-    p AS (
-        SELECT *
-        FROM att_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    m AS (
-        SELECT *
-        FROM af_message_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    af_callers as (SELECT DISTINCT(recording_id) as message_id, callerid FROM m)
-SELECT callerid, ARRAY_AGG(af_callers.message_id) as message_id, ARRAY_AGG(p.id) as att_id FROM af_callers LEFT JOIN p ON af_callers.callerid = p.number_orig
-GROUP BY af_callers.callerid
-;
-
-
-WITH
-    p AS (
-        SELECT *
-        FROM att_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    m AS (
-        SELECT *
-        FROM af_message_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    joined AS (
-        SELECT
-            m.callerid, ARRAY_AGG(p.id) AS att_data_id, ARRAY_AGG(m.recording_id) AS messages
-        FROM
-            m
-            LEFT JOIN
-            p
-            ON m.callerid = p.number_orig
-        GROUP BY m.callerid
-    )
-SELECT * from p WHERE id NOT IN (SELECT UNNEST(att_data_id) FROM joined)
-; -- ATT CALLS NOT IN ANSWER FIRST CALLER ID
-
-
-WITH
-    m AS (
-        SELECT *
-        FROM af_message_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    )
-SELECT
-    acct,
-    callerid,
-    COUNT(connected) AS calls,
-    ARRAY_AGG(phone) AS phone,
-    ARRAY_AGG(caller_name) AS caller_name,
-    ARRAY_AGG(reference) AS reference
-FROM m
-GROUP BY callerid, acct
-; -- ANSWER FIRST MESSAGES
-
-
-SELECT table_name, column_name
-FROM information_schema.columns
-WHERE table_name LIKE 'af\_%'
-;
-
-WITH
-    p AS (
-        SELECT *
-        FROM att_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    m AS (
-        SELECT *
-        FROM af_message_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    )
-SELECT
-    p.created,
-    p.connected,
-    p.duration,
-    p.number_orig,
-    p.number_dial,
-    p.number_term,
-    p.id,
-    p.zip,
-    p.state,
-    p.disconnect,
-    m.recording_id,
-    m.callerid,
-    m.acct,
-    m.ext,
-    m.call_for_ad,
-    m.practice_id,
-    m.zipcode,
-    m.connected,
-    m.statecheck,
-    m.addr_city,
-    m.majorcity,
-    m.besttime,
-    m.sent_emails_to,
-    m.city_id,
-    m.caller_name,
-    m.phone,
-    m.email,
-    m.addr_state,
-    m.reference
-FROM
-    p FULL OUTER JOIN m
-    on m.callerid =  p.number_orig
-;
-
-
-
--- Master Join to view all ATT and AF data joined together by caller id. Group by should isolate unite caller id/toll destination combinations, aka: origin/termination combinations. Other fields are aggregated together into arrays of unique values or all values for duplicates within the GROUP BY combinations.
--- CREATE OR REPLACE VIEW master_join AS
-WITH
-    p AS (
-        SELECT *
-        FROM att_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    ),
-    m AS (
-        SELECT *
-        FROM af_message_data
-        WHERE
-            connected < '2022-10-24'
-            AND
-            connected >= '2022-10-21'
-    )
-SELECT
-    -- COUNT(p.created) AS mms_createds,
-   p.number_orig AS att_callerid,
-   m.callerid AS af_callerid,
-   p.number_dial AS toll,
-   m.acct AS af_acct,
-   m.practice_id AS practice_id,
-   p.number_term AS att_fwd,
-   ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.recording_id)), NULL)
-        AS af_ids,
-    COUNT(p.connected) AS att_connections,
-    CASE WHEN COUNT(m.connected)::INTEGER = 0
-        THEN NULL
-        ELSE COUNT(m.connected)::INTEGER
-        END
-        AS af_connections,
-    ARRAY_AGG(p.duration) AS att_durations,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(p.id)), NULL)
-        AS att_ids,
-    CASE WHEN m.callerid IS NOT NULL
-        THEN ARRAY_REPLACE(ARRAY_AGG(m.call_for_ad), NULL, FALSE)::BOOLEAN[]
-        ELSE ARRAY_REMOVE(ARRAY_AGG(m.call_for_ad), NULL)::BOOLEAN[]
-        END
-        AS af_typed,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.besttime)), NULL)
-        AS af_msg_besttimes,
-    ARRAY_REMOVE(ARRAY_AGG(m.sent_emails_to), NULL)
-        AS af_msg_emailed,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.caller_name)), NULL)
-        AS af_msg_caller_name,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.phone)), NULL)
-        AS af_msg_given_phones,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.email)), NULL)
-        AS af_msg_given_emails,
-    ARRAY_REMOVE(ARRAY_AGG(DISTINCT(m.addr_state)), NULL)
-        AS af_msg_given_addr_state,
-    ARRAY_REMOVE(ARRAY_AGG(m.reference), NULL)
-        AS af_msg_bodies
-FROM
-    p FULL OUTER JOIN m
-    on m.callerid =  p.number_orig
+    m.connected::DATE < 'today'
+    AND m.connected::DATE >= '2022-11-04'
+    AND P.connected::DATE >= '2022-11-04'
 GROUP BY
-    att_callerid,
-    af_callerid,
-    toll,
-    af_acct,
-    practice_id,
-    att_fwd
-;
+    att_callerid, af_callerid,
+    att_acct_af, af_acct,
+    att_toll,
+    af_practice_id,
+    af_client,
+    att_date, af_date
 
-
-SELECT * FROM af_message_data ORDER BY acct;
-
--- SELECT test @> ARRAY[TRUE], ver FROM
--- (
-    SELECT ARRAY[TRUE, FALSE, FALSE] @> ARRAY[TRUE] test, ARRAY[TRUE, FALSE, FALSE] ver
-    UNION
-    SELECT ARRAY[FALSE, FALSE, FALSE] @> ARRAY[TRUE] test, ARRAY[FALSE, FALSE, FALSE] ver
--- ) as xx
+ORDER BY af_date DESC, af_callerid ASC
 ;

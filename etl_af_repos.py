@@ -1,26 +1,31 @@
 # %%
 # HEADERS
 from datetime import datetime
-from os import environ
+from os import environ as os_environ
 from pathlib import Path
-from threading import Thread
-from time import perf_counter
-from xmlrpc.client import DateTime
 from dotenv import load_dotenv
 
 import pandas as pd
-from pandas import Series as Ser, DataFrame as Df
+from pandas import DataFrame as Df
 
-from table_config import FldCfg, TblCfg, af_cfgs, vntge_vw_sql, vntge_fmt
+from table_config import af_cfgs, vntge_vw_sql, vntge_fmt, enum_sql
 from db_engines import wh_db as db, db_load
 from sqlalchemy.types import TypeEngine
-
-from threading import Thread
+from sqlalchemy.dialects.postgresql import ENUM
 
 import re
+
+from logging import getLogger, Logger
+import traceback
+
+
+logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+
+
+
 # %% BASE CFGS
 load_dotenv()
-repos_path = Path(environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
+repos_path = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
 # %%
 # UNPAC VALS FROM CFGS DICT
@@ -30,8 +35,22 @@ filter_fld: str = af_cfgs['other_']['filter_fld']
 skiphead: int = af_cfgs['skiphead']
 remap: dict[str, dict[str, str | bool]] = af_cfgs['other_']['remap']
 dtype: dict[str, TypeEngine] = af_cfgs['dtype']
+astype: dict[str, TypeEngine] = af_cfgs['astype']
 src_label: str = af_cfgs['src_label']
 vntge_vw: str = af_cfgs['vintage_view_nm']
+# enums that are already defined
+enums: dict[str, str] = af_cfgs['other_']['enums']
+
+# enums that will need to capture their values from the DF categories
+enums_to_update: dict[str, str] = {
+        k: af_cfgs['fields'][k]['enum_name'] for k in
+        af_cfgs['fields'].keys()
+        if
+            (af_cfgs['fields'][k]['enum_name'] != None)
+            &
+            (not af_cfgs['fields'][k]['dtype'] != None)
+    }
+
 # %%
 # PARSE PATHS
 af_glob: str = src_label.replace('||', '*')
@@ -98,22 +117,48 @@ def et_() -> Df:
         .convert_dtypes()
         .rename(columns=rename)
     )
+
+    # removes junk rows/records
     df_ = df_.loc[df_[filter_fld].notna()]
 
     for c, m in remap.items():
         df_[c] = df_[c].map(m, na_action='ignore')
 
+    df_['connected'] = df_['connected'].dt.tz_localize(tz='US/Central')
+
+    df_ = df_.astype(astype)
     return df_
 
 def main():
+
+    df: Df = et_()
+
+    # capture enum values
+    for e, n in enums_to_update.items():
+        # create string of enum values
+        enums.update({
+            e: ENUM(*list(df[e].cat.categories), name=n)
+        })
+
+    # sql to drop enum types
+    presql: list[str] = [
+        enum_sql.format(e)
+        for e in enums.keys()
+    ]
+
+    dtype.update({
+        k: v for k, v in enums.items()
+    })
+
     db_load(
         db=db,
-        df=et_(),
+        df=df,
         tblnm=tblnm,
         dtype=dtype,
+        presql=presql,
         xtrasql=xtrasql
     )
-    print(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}")
+    logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")
 
 
 if __name__ == "__main__":

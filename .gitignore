@@ -3,3 +3,7 @@
 master_join.csv
 __pycache__
 __pycache__/*
+AFDir.AdvancedMedical_9816.csv
+AFDir.MensPerformance_6933.csv
+AFDir.NeuropothyHotline_7930.csv
+*.pyc
