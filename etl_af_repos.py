@@ -126,6 +126,7 @@ def et_() -> Df:
 
     df_['connected'] = df_['connected'].dt.tz_localize(tz='US/Central')
 
+
     df_ = df_.astype(astype)
     return df_
 
@@ -163,3 +164,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# # %% testing main
+# df: Df = et_()
+# # %% # capture enum values
+# for e, n in enums_to_update.items():
+#     # create string of enum values
+#     enums.update({
+#         e: ENUM(*list(df[e].cat.categories), name=n)
+#     })
+
+# # sql to drop enum types
+# presql: list[str] = [
+#     enum_sql.format(e)
+#     for e in enums.keys()
+# ]
+
+# dtype.update({
+#     k: v for k, v in enums.items()
+# })
+
+# db_load(
+#     db=db,
+#     df=df,
+#     tblnm=tblnm,
+#     dtype=dtype,
+#     presql=presql,
+#     xtrasql=xtrasql
+# )
+# logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")

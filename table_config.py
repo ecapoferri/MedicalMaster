@@ -149,8 +149,8 @@ af_fields = {
     ),
     'ext': FldCfg(
         orig='Extension',
-        dtype=INTEGER,
-        astype=None,
+        dtype=VARCHAR,
+        astype='string',
         enum_name=None
     ),
     'addr_state': FldCfg(
