@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 
 import re
 
-from logging import getLogger, Logger
+from logging import getLogger
 import traceback
 
 

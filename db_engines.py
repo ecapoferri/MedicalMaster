@@ -120,3 +120,25 @@ def check_connection(db_: Engine):
             raise Exception(
                 f"\x1b[91mLooks Like a problem with your connection to {db_.name};\x1b[0m\nSee below:\n\n{traceback.format_exc()}\n"
             )
+
+
+def vintage_check(path_: str | Path) -> tuple[datetime | str]:
+    """
+    Args:
+        path_ (str | Path): string or path to file
+
+    Raises:
+        ValueError: if the path_ arg is the wrong type
+
+    Returns:
+        tuple[datetime|str]:
+            Actual datetime object (tz agnostic)
+            AND a formatted string as '%Y-%m-%d %H:%M:%S',
+                aka yyyy-mm-dd hh:mm:ss
+    """
+    if not (type(path_) in (type(Path('/')), type(str('')))):
+        raise ValueError(f"'path_ arg must be of type pathlib.Path or str.")
+    pth = path_ if type(path_) == type(Path()) else Path(path_)
+    dt = datetime.fromtimestamp(pth.stat().st_mtime)
+
+    return (dt, dt.strftime(vntge_fmt))
