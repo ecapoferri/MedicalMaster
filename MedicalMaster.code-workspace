@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"sqltools.connections": [
+			{
+				"previewLimit": 50,
+				"server": "127.0.0.1",
+				"port": 55432,
+				"driver": "PostgreSQL",
+				"name": "pg-cont",
+				"database": "medmstr",
+				"username": "pmrprt",
+				"password": "swagger0"
+			}
+		]
+	}
+}

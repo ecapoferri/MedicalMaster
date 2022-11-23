@@ -44,12 +44,10 @@ SELECT
 
 
     SUM(duration) durations_sum,
-   p.connected::DATE att_date,
-    MIN(p.connected) att_connected,
-    -- NULLIF(array_remove(array_agg(DISTINCT(p.connected)), NULL), '{}')
-    --     att_connected,
-   m.connected::DATE af_date,
-    MIN(m.connected) af_connected
+    NULLIF(array_remove(array_agg(DISTINCT(p.connected)), NULL), '{}') att_connections,
+    MIN(p.connected)::TIMESTAMP att_connected,
+    NULLIF(array_remove(array_agg(DISTINCT(m.connected)), NULL), '{}') af_connections,
+    MIN(m.connected)::TIMESTAMP af_connected
 
 
 
@@ -65,14 +63,12 @@ FROM att_data p FULL OUTER JOIN af_message_data m
 WHERE
     m.connected::DATE < 'today'
     AND m.connected::DATE >= '2022-11-04'
-    AND P.connected::DATE >= '2022-11-04'
+    AND p.connected::DATE >= '2022-11-04'
 GROUP BY
     att_callerid, af_callerid,
     att_acct_af, af_acct,
     att_toll,
     af_practice_id,
-    af_client,
-    att_date, af_date
-
-ORDER BY af_date DESC, af_callerid ASC
+    af_client
+ORDER BY af_connected DESC, att_connected DESC
 ;

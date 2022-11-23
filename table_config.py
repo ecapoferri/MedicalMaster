@@ -93,15 +93,15 @@ att_cfgs: dict[str, dict|str] = {
     'vintage_view_nm': 'att_vntge',
     'field_stmts': [
         'id',
-        "CONVERT_TZ(connected, 'UTC', 'US/Central') AS connected",
+        'connected',
         'duration',
         'number_orig',
         'number_dial',
         'number_term',
-        "CONVERT_TZ(disconnect, 'UTC', 'US/Central') AS disconnect",
+        'disconnect',
         'zip',
         'state',
-        "CONVERT_TZ(created, 'UTC', 'US/Central') AS created",
+        'created',
     ]
 
 }
@@ -113,8 +113,8 @@ state_list: list[str] = [
 af_fields = {
     'connected': FldCfg(
         orig='Date/Time',
-        dtype=TIMESTAMP(timezone=True),
-        astype='datetime64[ns, US/Central]',
+        dtype=TIMESTAMP(timezone=False),
+        astype='datetime64[ns]',
         enum_name=None
     ),
     'recording_id': FldCfg(
@@ -296,7 +296,6 @@ att_file_fields: dict[str|int, FldCfg] = {
             orig=None,
             astype='datetime64[ns, US/Central]',
             dtype=TIMESTAMP(timezone=True)
-            # dtype=TIMESTAMP(timezone=True)
         ),
         'number_orig': FldCfg(
             orig=4,

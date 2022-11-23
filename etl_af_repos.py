@@ -124,8 +124,9 @@ def et_() -> Df:
     for c, m in remap.items():
         df_[c] = df_[c].map(m, na_action='ignore')
 
-    df_['connected'] = df_['connected'].dt.tz_localize(tz='US/Central')
-
+    # df_['connected'] = (
+    #     df_['connected']
+    # )
 
     df_ = df_.astype(astype)
     return df_
