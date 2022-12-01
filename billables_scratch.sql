@@ -10,33 +10,6 @@ WHERE
 
 DROP TABLE billables;
 
--- select unique records from billables table
-WITH a AS(
-    SELECT
-        id,
-        client_callerid,
-        toll_dialed,
-        practice_id,
-        campaign_id,
-        UNNEST(names) client_name,
-        lead_delivery_date
-    FROM
-        billables
-)
-SELECT
-    client_callerid,
-    practice_id,
-    array_agg(DISTINCT(campaign_id)) campaign_ids,
-    array_agg(DISTINCT(toll_dialed)) tolls_dialed,
-    array_agg(DISTINCT(client_name)) names,
-    array_agg(DISTINCT(lead_delivery_date)) dates,
-    COUNT(id) delivered_n_times
-FROM
-    a
-GROUP BY
-    client_callerid,
-    practice_id
-;
 
 SELECT * FROM med_master_join
 WHERE att_connected < '@today'

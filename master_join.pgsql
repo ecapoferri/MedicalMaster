@@ -61,7 +61,7 @@ FROM att_data p FULL OUTER JOIN af_message_data m
     p.connected::DATE = m.connected::DATE
 
 WHERE
-    m.connected::DATE < 'today'
+    m.connected::DATE < '@today'
     AND m.connected::DATE >= '2022-11-04'
     AND p.connected::DATE >= '2022-11-04'
 GROUP BY

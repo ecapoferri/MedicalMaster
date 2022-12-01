@@ -122,7 +122,8 @@ def clean(df__: Df):
             +
             pd.to_timedelta(df__[datetime_time])
         )
-        .dt.tz_localize(tz='US/Central')
+        .dt.tz_localize(tz='UTC')
+        # .dt.tz_localize(tz='US/Central')
     )
     df__ = df__.drop(columns=[datetime_date, datetime_time])
 
