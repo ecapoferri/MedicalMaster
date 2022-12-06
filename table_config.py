@@ -335,7 +335,7 @@ att_file_fields: dict[str|int, FldCfg] = {
         )
     }
 att_file_cfg = TblCfg(
-        src_label='RPRT.ATT||*.tab.gz',
+    src_label='*DAILY DEBT - ANSWER FIRST*.tab.gz',
         fields=att_file_fields,
         dtype={
             k: d['dtype']
