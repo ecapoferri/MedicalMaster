@@ -5,3 +5,6 @@ __pycache__/*
 *.csv
 *.dump
 *.gz
+client_map.json
+MedicalMaster.code-workspace
+test.py

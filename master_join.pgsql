@@ -65,6 +65,7 @@ WHERE
     AND m.connected::DATE >= '2022-11-04'
     AND p.connected::DATE >= '2022-11-04'
 GROUP BY
+    --this takes care of duplicate records arising in the source repos
     att_callerid, af_callerid,
     att_acct_af, af_acct,
     att_toll,

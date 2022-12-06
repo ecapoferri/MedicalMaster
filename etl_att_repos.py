@@ -8,6 +8,7 @@ from pathlib import Path
 from io import BytesIO
 import gzip
 import re
+import json
 
 from os import environ as os_environ
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ from db_engines import db_load, wh_db as db
 from logging import getLogger, Logger
 import traceback
 
+phone_path = Path(os_environ['PRMDIA_MM_PHONE_MAP_PTH'])
 
 repos_pth = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
@@ -54,6 +56,12 @@ repos_dir: Path = repos_pth / repos_dir_pth
 path_list: list[Path] = list(repos_dir.glob(file_glob))
 
 # %%
+def get_toll_map() -> dict:
+    return {
+        int(k): int(v) for k, v in
+        json.loads(phone_path.read_text()).items()
+    }
+
 def get_latest_vntge(paths_: list[Path]) -> datetime:
     mts: list[float] = [
             p.stat().st_mtime for p in paths_
@@ -111,7 +119,7 @@ def read_append(paths: list[Path]) -> Df:
     return df_
 
 
-def clean(df__: Df):
+def clean(df__: Df, toll_map: dict):
     df__ = df__.drop_duplicates(subset=dup_subset).reset_index(drop=True)
 
     # date and time are separate and utc. need to convert, combine, localize, and convert
@@ -126,6 +134,11 @@ def clean(df__: Df):
         # .dt.tz_localize(tz='US/Central')
     )
     df__ = df__.drop(columns=[datetime_date, datetime_time])
+
+
+    # map af_acct via toll list to avoid lag in human updates...
+    df__ = df__.drop(columns=['acct_af'])
+    df__['acct_af'] = df__['number_dial'].map(toll_map)
 
     # for c in fix_intervals:
     #     df__[c] = pd.to_timedelta(df__[c])
@@ -147,11 +160,11 @@ def main():
 
 
     df = read_append(path_list)
-
+    toll_map = get_toll_map()
     db_load(
         tblnm=tblnm,
         db=db,
-        df=clean(df),
+        df=clean(df, toll_map=toll_map),
         dtype=dtype,
         presql=presql,
         xtrasql=xtrasql

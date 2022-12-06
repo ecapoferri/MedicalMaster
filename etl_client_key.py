@@ -13,18 +13,18 @@ load_dotenv()
 # Unpack Config
 logger = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
 
-config: dict[str, str|int] = json_loads(Path('client_map.json').read_text())
+config: dict[str, str|int] = json_loads(Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())
 
 tblnm: str = config['tblnm']
 
 astype: dict[str, str] = config['astype']
 
-df_key = 'map'
+DF_KEY = 'map'
 
 # %%
 def main():
     df = (
-        Df.from_dict(config[df_key])
+        Df.from_dict(config[DF_KEY])
         .convert_dtypes()
         .astype(astype)
     )
