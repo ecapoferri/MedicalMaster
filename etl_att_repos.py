@@ -19,8 +19,7 @@ from sqlalchemy.types import TypeEngine
 from table_config import att_file_cfg, vntge_vw_sql, vntge_fmt
 from db_engines import db_load, wh_db as db
 
-from logging import getLogger, Logger
-import traceback
+from logging import getLogger
 
 REPOS_PTH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
@@ -106,7 +105,9 @@ def clean(df__: Df):
     # columns subset to eval duplicate records
     DUP_SUBSET: list[str] = att_file_cfg['other_']['dup_subset']
 
+    # name of timestamp column
     DATETIME_COL: str = list(DTPARTS.keys())[0]
+    # 
     DATETIME_DATE: str = list(DTPARTS.values())[0][0]
     DATETIME_TIME: str = list(DTPARTS.values())[0][1]
 
@@ -116,7 +117,7 @@ def clean(df__: Df):
 
     df__ = df__.drop_duplicates(subset=DUP_SUBSET).reset_index(drop=True)
 
-    # date and time are separate and utc.
+    # date and time are separate and ... (central time in the source...there's...weirdness).
     # need to convert, combine, localize, and convert
     df__[DATETIME_COL] = (
         # this makes a pd.Series
@@ -142,11 +143,11 @@ def clean(df__: Df):
 def main():
     # strings and things for addressing source files
     SRC_PARTS: list[str] = att_file_cfg['src_label'].split('||')
-    file_glob: str = SRC_PARTS[1]
+    FILE_GLOB: str = SRC_PARTS[1]
     REPOS_PTH_STR: str = SRC_PARTS[0]
 
     repos_pth_att: Path = REPOS_PTH / REPOS_PTH_STR
-    path_list: list[Path] = list(repos_pth_att.glob(file_glob))
+    path_list: list[Path] = list(repos_pth_att.glob(FILE_GLOB))
 
     TBLNM: str = att_file_cfg['tblnm']
 
@@ -185,6 +186,7 @@ def main():
         xtrasql=xtrasql
     )
 
+    # this will broadcast to the outer logger via name hierarchy
     logger.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {db.engine}\x1b[0m")
 
     return
