@@ -22,44 +22,16 @@ from db_engines import db_load, wh_db as db
 from logging import getLogger, Logger
 import traceback
 
-phone_path = Path(os_environ['PRMDIA_MM_PHONE_MAP_PTH'])
+REPOS_PTH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
-repos_pth = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
-
-logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
-
-tblnm: str = att_file_cfg['tblnm']
-use_cols: list[str|int] = att_file_cfg['use_cols']
-dtype: dict[str, TypeEngine] = att_file_cfg['dtype']
-astype: dict[str, str] = att_file_cfg['astype']
-rename: dict[str, str] = att_file_cfg['rename']
-dtparts: dict[str, tuple[str]] = att_file_cfg['other_']['dtparts']
-datetime_col: str = list(dtparts.keys())[0]
-datetime_date: str = list(dtparts.values())[0][0]
-datetime_time: str = list(dtparts.values())[0][1]
-out_cols: list[str] = att_file_cfg['out_cols']
-skiphead: int = att_file_cfg['skiphead']
-src_parts: list[str] = att_file_cfg['src_label'].split('||')
-repos_dir_pth: str = src_parts[0]
-file_glob: str = src_parts[1]
-filt_col: str = att_file_cfg['other_']['non_null_filt']
-bad_filt_vals: list = att_file_cfg['other_']['bad_filt_vals']
-acct_col: str = att_file_cfg['other_']['acct_col']
-re_ptn: str = att_file_cfg['other_']['acct_reptn']
-dup_subset: list[str] = att_file_cfg['other_']['dup_subset']
-fix_intervals: list[str] = att_file_cfg['other_']['fix_intervals']
-presql: list[str] = att_file_cfg['pre_sql']
-xtrasql: list[str] = att_file_cfg['xtra_sql']
-vntge_vw: str = att_file_cfg['vintage_view_nm']
-
-repos_dir: Path = repos_pth / repos_dir_pth
-path_list: list[Path] = list(repos_dir.glob(file_glob))
 
 # %%
 def get_toll_map() -> dict:
+    PHONE_PATH = Path(os_environ['PRMDIA_MM_PHONE_MAP_PTH'])
+
     return {
         int(k): int(v) for k, v in
-        json.loads(phone_path.read_text()).items()
+        json.loads(PHONE_PATH.read_text()).items()
     }
 
 def get_latest_vntge(paths_: list[Path]) -> datetime:
@@ -71,16 +43,24 @@ def get_latest_vntge(paths_: list[Path]) -> datetime:
     return datetime.fromtimestamp(mx)
 
 
-def read_append(paths: list[Path]) -> Df:
+def read_append(path_list: list[Path]) -> Df:
+    USE_COLS: list[str | int] = att_file_cfg['use_cols']
+    RENAME: dict[str, str] = att_file_cfg['rename']
+    SKIPHEAD: int = att_file_cfg['skiphead']
+    FILT_COL: str = att_file_cfg['other_']['non_null_filt']
+    BAD_FILT_VALS: list = att_file_cfg['other_']['bad_filt_vals']
+    RE_PTN: str = att_file_cfg['other_']['acct_reptn']
+
+
     df_ = Df()
 
     # TODO: #1 THREAD THIS OUT: DO A THREAD POOL OR MULTIPROCESSING POOL OR
     #  WHATEVER AND PD.CONCAT THE RESULTING DFS,
     #  THERE'S A WAY TO GET A LIST OF RESULTS FROM A LIST OF THREADS/PROCESSES
-    for file_pth in paths:
+    for file_pth in path_list:
         # get acct number from filename
-        st = re.search(re_ptn, file_pth.name).start()
-        lmt = re.search(re_ptn, file_pth.name).end() - 3
+        st = re.search(RE_PTN, file_pth.name).start()
+        lmt = re.search(RE_PTN, file_pth.name).end() - 3
         acct = int(file_pth.name[st:lmt])
 
         tab_bytes = BytesIO(gzip.decompress(file_pth.read_bytes()))
@@ -97,16 +77,16 @@ def read_append(paths: list[Path]) -> Df:
                     pd.read_csv(
                         tab_bytes,
                         header=None,
-                        skiprows=skiphead,
-                        usecols=use_cols,
+                        skiprows=SKIPHEAD,
+                        usecols=USE_COLS,
                         sep='\t'
                     )
-                    .rename(columns=rename)
+                    .rename(columns=RENAME)
                 )
             df_part = df_part.loc[
-                    pd.notna(df_part[filt_col])
+                    pd.notna(df_part[FILT_COL])
                     &
-                    ~df_part[filt_col].isin(bad_filt_vals)
+                    ~df_part[FILT_COL].isin(BAD_FILT_VALS)
                 ]
             # assign acct number
             df_part = df_part.assign(acct_af=acct)
@@ -119,36 +99,64 @@ def read_append(paths: list[Path]) -> Df:
     return df_
 
 
-def clean(df__: Df, toll_map: dict):
-    df__ = df__.drop_duplicates(subset=dup_subset).reset_index(drop=True)
+def clean(df__: Df):
+    ASTYPE: dict[str, str] = att_file_cfg['astype']
+    DTPARTS: dict[str, tuple[str]] = att_file_cfg['other_']['dtparts']
 
-    # date and time are separate and utc. need to convert, combine, localize, and convert
-    df__[datetime_col] = (
+    # columns subset to eval duplicate records
+    DUP_SUBSET: list[str] = att_file_cfg['other_']['dup_subset']
+
+    DATETIME_COL: str = list(DTPARTS.keys())[0]
+    DATETIME_DATE: str = list(DTPARTS.values())[0][0]
+    DATETIME_TIME: str = list(DTPARTS.values())[0][1]
+
+    ACCT_COL: str = att_file_cfg['other_']['acct_col']
+
+    toll_map = get_toll_map()
+
+    df__ = df__.drop_duplicates(subset=DUP_SUBSET).reset_index(drop=True)
+
+    # date and time are separate and utc.
+    # need to convert, combine, localize, and convert
+    df__[DATETIME_COL] = (
         # this makes a pd.Series
         (
-            pd.to_datetime(df__[datetime_date])
+            pd.to_datetime(df__[DATETIME_DATE])
             +
-            pd.to_timedelta(df__[datetime_time])
+            pd.to_timedelta(df__[DATETIME_TIME])
         )
         .dt.tz_localize(tz='UTC')
         # .dt.tz_localize(tz='US/Central')
     )
-    df__ = df__.drop(columns=[datetime_date, datetime_time])
+    df__ = df__.drop(columns=[DATETIME_DATE, DATETIME_TIME])
 
+    df__ = df__.astype(ASTYPE)
 
     # map af_acct via toll list to avoid lag in human updates...
-    df__ = df__.drop(columns=['acct_af'])
-    df__['acct_af'] = df__['number_dial'].map(toll_map)
-
-    # for c in fix_intervals:
-    #     df__[c] = pd.to_timedelta(df__[c])
-
-    df__ = df__.astype(astype)
+    df__ = df__.drop(columns=[ACCT_COL])
+    df__[ACCT_COL] = df__['number_dial'].map(toll_map)
 
     return df__
 
 
 def main():
+    # strings and things for addressing source files
+    SRC_PARTS: list[str] = att_file_cfg['src_label'].split('||')
+    file_glob: str = SRC_PARTS[1]
+    REPOS_PTH_STR: str = SRC_PARTS[0]
+
+    repos_pth_att: Path = REPOS_PTH / REPOS_PTH_STR
+    path_list: list[Path] = list(repos_pth_att.glob(file_glob))
+
+    TBLNM: str = att_file_cfg['tblnm']
+
+    logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+
+    dtype: dict[str, TypeEngine] = att_file_cfg['dtype']
+    presql: list[str] = att_file_cfg['pre_sql']
+    xtrasql: list[str] = att_file_cfg['xtra_sql']
+    vntge_vw: str = att_file_cfg['vintage_view_nm']
+
     # get data vintage and add sql query to create view
     vntge: datetime = get_latest_vntge(path_list)
     xtrasql.append(
@@ -158,19 +166,26 @@ def main():
         )
     )
 
+    # read in from source files
+    df = read_append(
+        path_list=path_list
+    )
 
-    df = read_append(path_list)
-    toll_map = get_toll_map()
+    # cleanup:
+    #   dates/times
+    #   assign AF acct by toll num
+    df = clean(df)
+
     db_load(
-        tblnm=tblnm,
+        tblnm=TBLNM,
         db=db,
-        df=clean(df, toll_map=toll_map),
+        df=df,
         dtype=dtype,
         presql=presql,
         xtrasql=xtrasql
     )
 
-    logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")
+    logger.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {db.engine}\x1b[0m")
 
     return
 
