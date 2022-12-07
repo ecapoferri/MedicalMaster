@@ -1,4 +1,3 @@
-# %%
 # HEADERS
 from datetime import datetime
 from os import environ as os_environ
@@ -8,8 +7,8 @@ from dotenv import load_dotenv
 import pandas as pd
 from pandas import DataFrame as Df
 
-from table_config import af_cfgs, vntge_vw_sql, vntge_fmt, enum_sql
-from db_engines import wh_db as db, db_load
+from table_config import AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL
+from db_engines import wh_db as DB, db_load
 from sqlalchemy.types import TypeEngine
 from sqlalchemy.dialects.postgresql import ENUM
 
@@ -18,57 +17,37 @@ import re
 from logging import getLogger
 import traceback
 
-
-logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
-
-
-
-# %% BASE CFGS
 load_dotenv()
-repos_path = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
-# %%
-# UNPAC VALS FROM CFGS DICT
-tblnm: str = af_cfgs['tblnm']
-rename: dict[str, str] = af_cfgs['rename']
-filter_fld: str = af_cfgs['other_']['filter_fld']
-skiphead: int = af_cfgs['skiphead']
-remap: dict[str, dict[str, str | bool]] = af_cfgs['other_']['remap']
-dtype: dict[str, TypeEngine] = af_cfgs['dtype']
-astype: dict[str, TypeEngine] = af_cfgs['astype']
-src_label: str = af_cfgs['src_label']
-vntge_vw: str = af_cfgs['vintage_view_nm']
+REPOS_PATH = os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH']
+repos_path = Path(REPOS_PATH)
+
+SKIPHEAD: int = AF_CFGS['skiphead']
+RENAME: dict[str, str] = AF_CFGS['rename']
+FILTER_FLD: str = AF_CFGS['other_']['filter_fld']
+REMAP: dict[str, dict[str, str | bool]] = AF_CFGS['other_']['remap']
+ASTYPE: dict[str, TypeEngine] = AF_CFGS['astype']
+
+# string for globbing paths
+AF_GLOB: str = AF_CFGS['src_label']
+# table name for db, also used as a general label
+TBLNM: str = AF_CFGS['tblnm']
+# dtype map
+DTYPE: dict[str, TypeEngine] = AF_CFGS['dtype']
+# string to format with data vintage timestamp
+VNTGE_VW: str = AF_CFGS['vintage_view_nm']
 # enums that are already defined
-enums: dict[str, str] = af_cfgs['other_']['enums']
+ENUMS: dict[str, str] = AF_CFGS['other_']['enums']
 
-# enums that will need to capture their values from the DF categories
-enums_to_update: dict[str, str] = {
-        k: af_cfgs['fields'][k]['enum_name'] for k in
-        af_cfgs['fields'].keys()
-        if
-            (af_cfgs['fields'][k]['enum_name'] != None)
-            &
-            (not af_cfgs['fields'][k]['dtype'] != None)
-    }
+def data_vintage_timestamp(paths: list[Path]) -> str:
+    timestamp_lst: list[float] = [
+            f.stat().st_mtime for f in paths
+        ]
+    timestamp_lst.sort(reverse=True)
+    return datetime.fromtimestamp(timestamp_lst[0]).strftime(VNTGE_FMT)
 
-# %%
-# PARSE PATHS
-af_glob: str = src_label.replace('||', '*')
-af_files: list[Path] = list(repos_path.rglob(af_glob))
 
-# get timestamp for data vintage
-timestamp_lst: list[float] = [
-        f.stat().st_mtime for f in af_files
-    ]
-timestamp_lst.sort(reverse=True)
-tmstmp: str = datetime.fromtimestamp(timestamp_lst[0]).strftime(vntge_fmt)
-
-xtrasql: list[str] = [
-    vntge_vw_sql.format(nm=vntge_vw, ts=tmstmp)
-]
-del timestamp_lst, tmstmp
-
-def load_xls_sheet(f: Path) -> Df:
+def load_xls_sheet(f: Path, skiphead) -> Df:
     xl = pd.ExcelFile(f)
     load_df: Df
     for sh in xl.sheet_names:
@@ -79,9 +58,13 @@ def load_xls_sheet(f: Path) -> Df:
     return load_df
 
 
-def et_() -> Df:
-    df_ = Df()
-    for f in af_files:
+def et_(paths: list[Path]) -> Df:
+
+    # initilize a df to add parsed tables
+    accum_df = Df()
+
+    for f in paths:
+
         # get acct number from filename
         acct_num: int = int(
                 re.sub(
@@ -95,102 +78,98 @@ def et_() -> Df:
         
         xl = pd.ExcelFile(f)
         
-        df_ = pd.concat([
-            df_,
+        accum_df = pd.concat([
+            accum_df,
             *[
-                xl.parse(sh, skiprows=skiphead)
+                xl.parse(sh, skiprows=SKIPHEAD)
+                # add column with acct number, based on filename
                 .assign(acct=acct_num)
                 for sh in xl.sheet_names
             ]
         ])
 
-    # thread_list = [Thread(target=load_xls_sheet, args=[f]) for f in af_files]
+        del xl, acct_num, 
 
-    # remove junk columns
+    # remove junk columns to avoid column bloat from random junk columns across the source files
     use_cols: list[str] = [
-        c for c in list(df_.columns)
+        c for c in list(accum_df.columns)
         if not re.findall(r'Unnamed: \d', c)
     ]
 
-    df_ = (
-        df_[use_cols]
+    # select down to intended columns and rename
+    accum_df = (
+        accum_df[use_cols]
         .convert_dtypes()
-        .rename(columns=rename)
+        .rename(columns=RENAME)
     )
 
     # removes junk rows/records
-    df_ = df_.loc[df_[filter_fld].notna()]
+    accum_df = accum_df.loc[accum_df[FILTER_FLD].notna()]
 
-    for c, m in remap.items():
-        df_[c] = df_[c].map(m, na_action='ignore')
+    # remap to better values, such as Yes/No to booleans
+    # structure in input config is <column_name>: {<old_value>: <new_value>}
+    #   i.e.: {'call_for_ad': {'Yes': True, 'No': False}
+    for c, m in REMAP.items():
+        accum_df[c] = accum_df[c].map(m, na_action='ignore')
 
-    # df_['connected'] = (
-    #     df_['connected']
-    # )
+    # tidy up dtypes
+    accum_df = accum_df.astype(ASTYPE)
 
-    df_ = df_.astype(astype)
-    return df_
+    return accum_df
 
 def main():
+    logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
 
-    df: Df = et_()
+    # enums that will need to capture their values from the DF categories
+    enums_to_update: dict[str, str] = {
+        k: AF_CFGS['fields'][k]['enum_name'] for k in
+        AF_CFGS['fields'].keys()
+        if
+            (AF_CFGS['fields'][k]['enum_name'] != None)
+            &
+            (not AF_CFGS['fields'][k]['dtype'] != None)
+    }
 
-    # capture enum values
+    # PARSE PATHS
+    af_files: list[Path] = list(repos_path.rglob(AF_GLOB))
+
+    # get data vintage
+    tmstmp = data_vintage_timestamp(paths=af_files)
+
+    # update post load sql query with a view holding data vintage
+    xtrasql: list[str] = [
+        VNTGE_VW_SQL.format(nm=VNTGE_VW, ts=tmstmp)
+    ]
+
+    df: Df = et_(paths=af_files)
+
+    # capture enum values to update enum dtype in db
+    enums: dict[str, str] = ENUMS
     for e, n in enums_to_update.items():
         # create string of enum values
         enums.update({
             e: ENUM(*list(df[e].cat.categories), name=n)
         })
 
-    # sql to drop enum types
+    # sql to prep db, in this case dropping and replacing enums
     presql: list[str] = [
-        enum_sql.format(e)
+        ENUM_SQL.format(e)
         for e in enums.keys()
     ]
 
-    dtype.update({
-        k: v for k, v in enums.items()
-    })
+    # add captured enum types with new values to dtype map
+    dtype: dict[str, TypeEngine] = DTYPE.update({k: v for k, v in enums.items()})
 
     db_load(
-        db=db,
+        db=DB,
         df=df,
-        tblnm=tblnm,
+        tblnm=TBLNM,
         dtype=dtype,
         presql=presql,
         xtrasql=xtrasql
     )
-    logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")
+    logger.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
 
 
 if __name__ == "__main__":
     main()
-
-# # %% testing main
-# df: Df = et_()
-# # %% # capture enum values
-# for e, n in enums_to_update.items():
-#     # create string of enum values
-#     enums.update({
-#         e: ENUM(*list(df[e].cat.categories), name=n)
-#     })
-
-# # sql to drop enum types
-# presql: list[str] = [
-#     enum_sql.format(e)
-#     for e in enums.keys()
-# ]
-
-# dtype.update({
-#     k: v for k, v in enums.items()
-# })
-
-# db_load(
-#     db=db,
-#     df=df,
-#     tblnm=tblnm,
-#     dtype=dtype,
-#     presql=presql,
-#     xtrasql=xtrasql
-# )
-# logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")

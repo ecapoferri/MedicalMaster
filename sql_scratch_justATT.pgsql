@@ -4,17 +4,17 @@ WITH
         SELECT *
         FROM att_data
         WHERE
-            connected < '2022-11-09'
+            connected < '2022-12-07'
             AND
-            connected >= '2022-11-04'
+            connected >= '2022-12-06'
     ),
     m AS (
         SELECT *
         FROM af_message_data
         WHERE
-            connected < '2022-11-09'
+            connected < '2022-12-07'
             AND
-            connected >= '2022-11-04'
+            connected >= '2022-12-06'
     )
 SELECT
    p.connected::DATE att_date,

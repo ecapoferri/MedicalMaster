@@ -15,7 +15,7 @@ from datetime import datetime
 
 from pandas import DataFrame as Df
 
-from table_config import vntge_fmt
+from table_config import VNTGE_FMT
 
 load_dotenv()
 
@@ -94,7 +94,7 @@ def fs_tmstmp(path_: Path) -> str:
             path_.stat()
             .st_mtime
         )
-        .strftime(vntge_fmt))
+        .strftime(VNTGE_FMT))
     return tmstmp
 
 
@@ -141,4 +141,4 @@ def vintage_check(path_: str | Path) -> tuple[datetime | str]:
     pth = path_ if type(path_) == type(Path()) else Path(path_)
     dt = datetime.fromtimestamp(pth.stat().st_mtime)
 
-    return (dt, dt.strftime(vntge_fmt))
+    return (dt, dt.strftime(VNTGE_FMT))

@@ -4,7 +4,7 @@ from typing import\
     Optional
 
 from sqlalchemy.types import TypeEngine
-from sqlalchemy.dialects.postgresql import INTEGER, BIGINT, BOOLEAN, VARCHAR, TEXT, ENUM, INTERVAL, TIMESTAMP
+from sqlalchemy.dialects.postgresql import INTEGER, BIGINT, BOOLEAN, VARCHAR, TEXT, ENUM, INTERVAL, TIMESTAMP, DATE
 
 from os import environ
 from dotenv import load_dotenv
@@ -74,21 +74,21 @@ class TblCfg(TypedDict):
 #== TABLE CONFIGS ==================>
 trailing_days: int = 10
 
-vntge_vw_sql = """--sql
+VNTGE_VW_SQL = """--sql
         CREATE OR REPLACE VIEW {nm} AS
         SELECT CAST('{ts}' AS TIMESTAMP) AS {nm}
         ;
     """.replace('--sql\n', '')
 
-enum_sql = """
+ENUM_SQL = """
         DROP TYPE IF EXISTS {} CASCADE;
     """
 
-vntge_fmt: str = r'%Y-%m-%d %H:%M:%S'
+VNTGE_FMT: str = r'%Y-%m-%d %H:%M:%S'
 
 
 # ATT - for a simple query to mms
-att_cfgs: dict[str, dict|str] = {
+ATT_CFGS: dict[str, dict|str] = {
     'tblnm': 'att_data',
     'vintage_view_nm': 'att_vntge',
     'field_stmts': [
@@ -106,11 +106,11 @@ att_cfgs: dict[str, dict|str] = {
 
 }
 
-state_list: list[str] = [
+STATE_LIST: list[str] = [
     'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA', 'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UM', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'
 ]
 # ANSWER FIRST
-af_fields = {
+AF_FIELDS = {
     'connected': FldCfg(
         orig='Date/Time',
         dtype=TIMESTAMP(timezone=False),
@@ -203,7 +203,7 @@ af_fields = {
     ),
     'statecheck': FldCfg(
         orig='StateCheck',
-        dtype=ENUM(*state_list, name='af_lead_state_enum'),
+        dtype=ENUM(*STATE_LIST, name='af_lead_state_enum'),
         astype=None,
         enum_name='enum_statecheck_enum'
     ),
@@ -244,13 +244,13 @@ af_fields = {
         enum_name='af_clients_enum'
     )
 }
-af_cfgs = TblCfg(
+AF_CFGS = TblCfg(
     # for glob or regex
-    src_label=environ['PRMDIA_REPOS_AF_FILE_LABEL']+'||'+environ['PRMDIA_REPOS_AF_FILE_EXT'],
+    src_label=environ['PRMDIA_REPOS_AF_FILE_LABEL']+'*'+environ['PRMDIA_REPOS_AF_FILE_EXT'],
     tblnm='af_message_data',
-    fields=af_fields,
+    fields=AF_FIELDS,
     vintage_view_nm='af_message_vntge',
-    rename={d['orig']: k for k, d in af_fields.items() if d['orig']},
+    rename={d['orig']: k for k, d in AF_FIELDS.items() if d['orig']},
     other_={
         'filter_fld': 'connected',
         'remap': {
@@ -261,13 +261,13 @@ af_cfgs = TblCfg(
         },
         'enums': {
             d['enum_name']: d['dtype']
-            for d in af_fields.values()
+            for d in AF_FIELDS.values()
             if d['enum_name']
         },
     },
     skiphead=1,
     dtype={
-        k: d['dtype'] for k, d in af_fields.items()
+        k: d['dtype'] for k, d in AF_FIELDS.items()
         if
             (type(d['dtype']) != None)
             &
@@ -275,13 +275,13 @@ af_cfgs = TblCfg(
     },
     astype={
         k: d['astype']
-        for k, d in af_fields.items()
+        for k, d in AF_FIELDS.items()
         if d['astype']
     }
 )
 
 
-att_file_fields: dict[str|int, FldCfg] = {
+ATT_FILE_FIELDS: dict[str|int, FldCfg] = {
         'connected_date': FldCfg(
             orig=2,
             dtype=None,
@@ -319,7 +319,7 @@ att_file_fields: dict[str|int, FldCfg] = {
         ),
         'state': FldCfg(
             orig=10,
-            # dtype=ENUM(*state_list, name='att_stat_enum'),
+            # dtype=ENUM(*STATE_LIST, name='att_stat_enum'),
             dtype=VARCHAR,
             astype='category'
         ),
@@ -334,26 +334,26 @@ att_file_fields: dict[str|int, FldCfg] = {
             dtype=INTEGER
         )
     }
-att_file_cfg = TblCfg(
+ATT_FILE_CFG = TblCfg(
     src_label='*DAILY DEBT - ANSWER FIRST*.tab.gz',
-        fields=att_file_fields,
+        fields=ATT_FILE_FIELDS,
         dtype={
             k: d['dtype']
-            for k, d in att_file_fields.items()
+            for k, d in ATT_FILE_FIELDS.items()
             if d['dtype'] != None
         },
         astype={
             k: d['astype']
-            for k, d in att_file_fields.items()
+            for k, d in ATT_FILE_FIELDS.items()
             if d['astype'] != None
         },
         rename={
             d['orig']: k
-            for k, d in att_file_fields.items()
+            for k, d in ATT_FILE_FIELDS.items()
             
         },
         use_cols=[
-            d['orig'] for d in att_file_fields.values()
+            d['orig'] for d in ATT_FILE_FIELDS.values()
             if d['orig'] != None
         ],
         other_={
@@ -373,8 +373,8 @@ att_file_cfg = TblCfg(
             ]
         },
         out_cols=[
-            k for k in att_file_fields.keys()
-            if att_file_fields[k]['dtype'] != None
+            k for k in ATT_FILE_FIELDS.keys()
+            if ATT_FILE_FIELDS[k]['dtype'] != None
         ],
         skiphead=3,
         tblnm='att_data',
@@ -383,12 +383,12 @@ att_file_cfg = TblCfg(
         vintage_view_nm='att_vntge'
     )
 [
-    att_file_cfg['pre_sql'].append(s) for s in (
+    ATT_FILE_CFG['pre_sql'].append(s) for s in (
         f"""--sql
-                DROP TABLE IF EXISTS {att_file_cfg['tblnm']} CASCADE;
+                DROP TABLE IF EXISTS {ATT_FILE_CFG['tblnm']} CASCADE;
         """.replace('--sql\n', ''),
         f"""--sql
-                DROP VIEW IF EXISTS {att_file_cfg['vintage_view_nm']};
+                DROP VIEW IF EXISTS {ATT_FILE_CFG['vintage_view_nm']};
         """.replace('--sql\n', '')
     )
 ]

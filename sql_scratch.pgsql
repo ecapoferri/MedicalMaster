@@ -1,4 +1,3 @@
-CREATE OR REPLACE VIEW med_master_join AS
 SELECT
    p.number_orig att_callerid,
    m.callerid af_callerid,
@@ -44,12 +43,10 @@ SELECT
 
 
     SUM(duration) durations_sum,
-   p.connected::DATE att_date,
-    MIN(p.connected) att_connected,
-    -- NULLIF(array_remove(array_agg(DISTINCT(p.connected)), NULL), '{}')
-    --     att_connected,
-   m.connected::DATE af_date,
-    MIN(m.connected) af_connected
+    NULLIF(array_remove(array_agg(DISTINCT(p.connected)), NULL), '{}') att_connections,
+    MIN(p.connected)::TIMESTAMP att_connected,
+    NULLIF(array_remove(array_agg(DISTINCT(m.connected)), NULL), '{}') af_connections,
+    MIN(m.connected)::TIMESTAMP af_connected
 
 
 
@@ -63,16 +60,23 @@ FROM att_data p FULL OUTER JOIN af_message_data m
     p.connected::DATE = m.connected::DATE
 
 WHERE
-    m.connected::DATE < 'today'
+    m.connected::DATE < '@today'
     AND m.connected::DATE >= '2022-11-04'
-    AND P.connected::DATE >= '2022-11-04'
+    AND p.connected::DATE >= '2022-11-04'
 GROUP BY
+    --this takes care of duplicate records arising in the source repos
     att_callerid, af_callerid,
     att_acct_af, af_acct,
     att_toll,
     af_practice_id,
-    af_client,
-    att_date, af_date
+    af_client
+ORDER BY af_connected DESC, att_connected DESC
+;
 
-ORDER BY af_date DESC, af_callerid ASC
+
+SELECT
+    connected AT TIME ZONE 'US/Central' AS cst,
+    connected AT TIME ZONE 'utc' AT TIME ZONE 'cst' AS utc_cst,
+    connected
+FROM att_data
 ;
