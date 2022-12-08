@@ -44,15 +44,21 @@ SELECT
 
 
     SUM(duration) durations_sum,
-    NULLIF(array_remove(array_agg(DISTINCT(p.connected AT TIME ZONE 'US/Central')), NULL), '{}') att_connections,
+    NULLIF(array_remove(array_agg(DISTINCT(
+        p.connected AT TIME ZONE 'US/Central')), NULL), '{}'
+    )
+        AS att_connections,
     MIN(p.connected AT TIME ZONE 'US/Central')::TIMESTAMP att_connected,
-    NULLIF(array_remove(array_agg(DISTINCT(m.connected)), NULL), '{}') af_connections,
+    NULLIF(
+        array_remove(array_agg(DISTINCT(m.connected)), NULL), '{}'
+    )
+        AS af_connections,
     MIN(m.connected)::TIMESTAMP af_connected
 
 
-
 FROM att_data p FULL OUTER JOIN af_message_data m
-    -- JOIN BY COMMON caller id, destination acct, date of call (CDT/CST CONVERTED FROM UTC)
+    -- JOIN BY COMMON caller id, destination acct,
+    -- date of call (CDT/CST CONVERTED FROM UTC)
     ON
     p.number_orig = m.callerid
     AND
@@ -64,6 +70,7 @@ WHERE
     m.connected::DATE < '@today'
     AND m.connected::DATE >= '2022-11-04'
     AND (p.connected AT TIME ZONE 'US/Central')::DATE >= '2022-11-04'
+
 GROUP BY
     --this takes care of duplicate records arising in the source repos
     att_callerid, af_callerid,
