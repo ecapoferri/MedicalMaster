@@ -33,7 +33,7 @@ SELECT
         ELSE NULL
         END
         AS call_for_ad,
-    -- 
+
     -- the rest are just lists of existing results
     NULLIF(array_remove(array_agg(DISTINCT(m.besttime)), NULL), '{}')
         af_msg_besttimes,

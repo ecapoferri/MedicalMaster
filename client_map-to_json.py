@@ -19,7 +19,8 @@ AS_TYPE = {'astype': {
     'client_id': 'Int64',
     'lead_ref_id': 'Int64',
     'lead_company': 'string',
-    'status': 'string'
+    'status': 'string',
+    'lead_email_form': 'string',
 }}
 
 SRC_FN = 'AFDir.xlsx'
@@ -32,7 +33,8 @@ USECOLS = [
     'lead_ref_id',
     'client_id',
     'lead_company',
-    'status'
+    'status',
+    'lead_email_form'
 ]
 
 RENAME = {
@@ -60,6 +62,7 @@ def main():
         .rename(columns=RENAME)
     )
 
+    # Remove pairs with NA values and load to dict.
     map_ = {
         col_key: {
             idx: val for idx, val in col.items()
@@ -67,10 +70,12 @@ def main():
         } for col_key, col in client_map.to_dict().items()
     }
 
-    out_dict = TBLNM | {"map": map_} | AS_TYPE
+    out_dict = TBLNM | AS_TYPE | {"map": map_}
 
     json_out.write_text(json.dumps(obj=out_dict))
-    
+
+    # Parse toll number map and store to json.
+    # TODO: May need to load to the db.
     phone = xl.parse(sheet_name=PHONE_MAP_SHEET_NAME)
     phone_dict = {k: v for v, k in phone.to_dict(orient='tight')['data']}
     phone_out.write_text(json.dumps(obj=phone_dict))

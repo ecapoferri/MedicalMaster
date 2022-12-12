@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import pandas as pd
 from pandas import DataFrame as Df
 
-from table_config import AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL
+from table_config import AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL, DATE_OUT_FLDNM
 from db_engines import wh_db as DB, db_load
 from sqlalchemy.types import TypeEngine
 from sqlalchemy.dialects.postgresql import ENUM
@@ -114,6 +114,8 @@ def et_(paths: list[Path]) -> Df:
 
     # tidy up dtypes
     accum_df = accum_df.astype(ASTYPE)
+
+    accum_df[DATE_OUT_FLDNM] = accum_df['connected'].dt.date
 
     return accum_df
 

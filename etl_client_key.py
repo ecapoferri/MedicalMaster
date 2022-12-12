@@ -1,5 +1,5 @@
-# %% Headers
-from db_engines import wh_db as db
+#Headers
+from db_engines import wh_db as DB
 import logging, traceback
 from os import environ as os_environ
 from dotenv import load_dotenv
@@ -9,35 +9,35 @@ from pandas import DataFrame as Df
 
 load_dotenv()
 
-# %% Config
 # Unpack Config
-logger = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
+LOGGER = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
 
-config: dict[str, str|int] = json_loads(Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())
+CONFIG: dict[str, str|int] = json_loads(
+    Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())
 
-tblnm: str = config['tblnm']
+TBLNM: str = CONFIG['tblnm']
 
-astype: dict[str, str] = config['astype']
+ASTYPE: dict[str, str] = CONFIG['astype']
 
 DF_KEY = 'map'
 
-# %%
 def main():
     df = (
-        Df.from_dict(config[DF_KEY])
+        Df.from_dict(CONFIG[DF_KEY])
         .convert_dtypes()
-        .astype(astype)
+        .astype(ASTYPE)
     )
 
-    with db.connect() as conn:
+    with DB.connect() as conn:
         df.to_sql(
-            name=tblnm,
+            name=TBLNM,
             con=conn,
             index=False,
             if_exists='replace'
         )
 
-    logger.info(f"\x1b[36;1mSuccessfully loaded {tblnm} to {db.engine}\x1b[0m")
+    LOGGER.info(
+        f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
 
     return
 

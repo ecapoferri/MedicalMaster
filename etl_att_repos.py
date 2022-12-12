@@ -15,13 +15,12 @@ load_dotenv()
 
 from sqlalchemy.types import TypeEngine
 
-from table_config import ATT_FILE_CFG, VNTGE_VW_SQL, VNTGE_FMT
+from table_config import ATT_FILE_CFG, VNTGE_VW_SQL, VNTGE_FMT, DATE_OUT_FLDNM
 from db_engines import db_load, wh_db as DB
 
 from logging import getLogger
 
-REPOS_PATH = os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH']
-repos_path = Path(REPOS_PATH)
+REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
 PHONE_PATH = os_environ['PRMDIA_MM_PHONE_MAP_PTH']
 
@@ -128,7 +127,7 @@ def read_append(path_list: list[Path]) -> Df:
         df_ = (
             pd.concat([df_, df_part])
             .reset_index(drop=True)
-            )
+        )
 
     return df_
 
@@ -153,6 +152,8 @@ def clean(df__: Df):
     )
     df__ = df__.drop(columns=[DATETIME_DATE, DATETIME_TIME])
 
+    df__[DATE_OUT_FLDNM] = df__[DATETIME_COL].dt.date
+
     df__ = df__.astype(ASTYPE)
 
     # map af_acct via toll list to avoid lag in human updates...
@@ -163,7 +164,7 @@ def clean(df__: Df):
 
 
 def main():
-    path_list: list[Path] = list(repos_path.rglob(FILE_RGLOB))
+    path_list: list[Path] = list(REPOS_PATH.rglob(FILE_RGLOB))
 
     logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
 

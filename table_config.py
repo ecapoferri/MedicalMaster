@@ -74,6 +74,13 @@ class TblCfg(TypedDict):
 #== TABLE CONFIGS ==================>
 trailing_days: int = 10
 
+# Name of the field which
+DATE_OUT_FLDNM = 'call_date'
+# Name of field with phone number.
+#   It will need to have non-digit characters removed.
+CALLERID_FLDNM = 'af_msg_id'
+
+
 VNTGE_VW_SQL = """--sql
         CREATE OR REPLACE VIEW {nm} AS
         SELECT CAST('{ts}' AS TIMESTAMP) AS {nm}
@@ -272,7 +279,7 @@ AF_CFGS = TblCfg(
             (type(d['dtype']) != None)
             &
             (type(d['dtype']) != type(ENUM('x', name='x')))
-    },
+    } | {DATE_OUT_FLDNM: DATE},
     astype={
         k: d['astype']
         for k, d in AF_FIELDS.items()
@@ -341,7 +348,7 @@ ATT_FILE_CFG = TblCfg(
             k: d['dtype']
             for k, d in ATT_FILE_FIELDS.items()
             if d['dtype'] != None
-        },
+        } | {DATE_OUT_FLDNM: DATE},
         astype={
             k: d['astype']
             for k, d in ATT_FILE_FIELDS.items()
@@ -392,3 +399,92 @@ ATT_FILE_CFG = TblCfg(
         """.replace('--sql\n', '')
     )
 ]
+
+# Name of the timestamp field. Will be used to derive a delivery date.
+INHOUSE_LEADS_TIMESTAMP_FLDNM = 'submitted'
+# Statement to get all records from BQ.
+BQ_SQL = f"""--sql
+SELECT
+    date_submitted {INHOUSE_LEADS_TIMESTAMP_FLDNM},
+    af_acct,
+    lead_name,
+    lead_phone,
+    practice,
+    city,
+    af_msg_id,
+    send_to_emails
+FROM `med_mstr.leads_email_form`
+;
+""".replace('--sql\n', '')
+# Incoming fields:
+INHOUSE_LEADS_SRC_FLDS: dict[str, FldCfg] = {
+    'submitted': FldCfg(
+        dtype=TIMESTAMP(timezone=False),
+        astype='datetime64[ns]',
+        enum_name=None,
+        use_col=True,
+    ),
+    'af_acct': FldCfg(
+        dtype=INTEGER,
+        astype='Int32',
+        enum_name=None,
+        use_col=True,
+    ),
+    'lead_name': FldCfg(
+        dtype=VARCHAR,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+    'lead_phone': FldCfg(
+        dtype=TEXT,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+    'practice': FldCfg(
+        dtype=None,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+    'city': FldCfg(
+        dtype=TEXT,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+    CALLERID_FLDNM: FldCfg(
+        dtype=BIGINT,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+    'send_to_emails': FldCfg(
+        dtype=TEXT,
+        astype='string',
+        enum_name=None,
+        use_col=True,
+    ),
+}
+# Extra fields:
+INHOUSE_LEAD_DATE_FLDNM = 'lead_delivery_date'
+INHOUSE_LEADS_OUT_FLDS: dict[str, FldCfg] = {
+    INHOUSE_LEAD_DATE_FLDNM: FldCfg(
+        astype='datetime64[ns]',
+        dtype=DATE,
+    ),
+    'practice_id': FldCfg(
+        dtype=INTEGER,
+        astype=None
+    ),
+}
+INHOUSE_LEADS_FLDS = INHOUSE_LEADS_SRC_FLDS | INHOUSE_LEADS_OUT_FLDS
+INHOUSE_LEADS_CFGS = TblCfg(
+    tblnm='f_lead_email_form',
+    src_label=BQ_SQL,
+    dtype={k: v['dtype'] for k, v in INHOUSE_LEADS_FLDS.items() if v['dtype']},
+    astype={
+        k: v['astype'] for k, v in INHOUSE_LEADS_FLDS.items() if v['astype']},
+    use_cols=[k for k in INHOUSE_LEADS_SRC_FLDS.keys()],
+)
