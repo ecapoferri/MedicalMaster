@@ -16,7 +16,7 @@ load_dotenv()
 from sqlalchemy.types import TypeEngine
 
 from table_config import ATT_FILE_CFG, VNTGE_VW_SQL, VNTGE_FMT, DATE_OUT_FLDNM
-from db_engines import db_load, wh_db as DB
+from db_engines import db_load, WH_DB as DB
 
 from logging import getLogger
 
@@ -166,7 +166,7 @@ def clean(df__: Df):
 def main():
     path_list: list[Path] = list(REPOS_PATH.rglob(FILE_RGLOB))
 
-    logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+    LOGGER = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
 
     # get data vintage and append sql query to create view
     vntge: datetime = get_latest_vntge(path_list)
@@ -195,8 +195,8 @@ def main():
         xtrasql=xtrasql,
     )
 
-    # this will broadcast to the outer logger via name hierarchy
-    logger.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
+    # this will broadcast to the outer LOGGER via name hierarchy
+    LOGGER.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
 
     return
 

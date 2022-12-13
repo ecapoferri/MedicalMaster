@@ -1,7 +1,5 @@
 from google.cloud import bigquery
 
-from datetime import datetime, timedelta, time
-import re
 import json
 from pandas import DataFrame as Df, Series as Ser
 import pandas as pd
@@ -16,7 +14,7 @@ from table_config import INHOUSE_LEADS_TIMESTAMP_FLDNM as TIMESTAMP_FLDNM,\
     CALLERID_FLDNM, INHOUSE_LEADS_CFGS as CFGS,\
     INHOUSE_LEAD_DATE_FLDNM as DATE_FLDNM
 
-from db_engines import wh_db as DB
+from db_engines import WH_DB as DB
 
 load_dotenv()
 CLIENT_KEY: dict = json.loads(
@@ -27,6 +25,10 @@ BQ_SQL = CFGS['src_label']
 ASTYPE = CFGS['astype']
 DTYPE = CFGS['dtype']
 TBLNM = CFGS['tblnm']
+PRE_SQL = CFGS['pre_sql']
+
+LOGGER = logging.getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+
 
 def extract_bq(query: str) -> Df:
     return (
@@ -70,11 +72,12 @@ def map_to_internal_keys(df__: Df) -> Df:
     return df_c_
 
 
-def load(df_load: Df) -> None:
+def load(df_load: Df, presql: list[str]) -> None:
     with DB.connect() as conn:
+        for s in presql:
+            conn.execute(s)
         df_load.to_sql(
-            name=TBLNM, con=conn, index=False, if_exists='replace', dtype=DTYPE
-        )
+            name=TBLNM, con=conn, index=False, if_exists='replace', dtype=DTYPE)
     return
 
 
@@ -84,7 +87,11 @@ def main():
         .pipe(transform)
         .pipe(map_to_internal_keys)
     )
-    load(df)
+    load(df_load=df, presql=PRE_SQL)
+
+    # this will broadcast to the outer LOGGER via name hierarchy
+    LOGGER.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
+
     return
 
 

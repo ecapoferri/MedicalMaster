@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 import pandas as pd
 from pandas import DataFrame as Df
 
-from table_config import AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL, DATE_OUT_FLDNM
-from db_engines import wh_db as DB, db_load
+from table_config import\
+    AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL, DATE_OUT_FLDNM
+from db_engines import WH_DB as DB, db_load
 from sqlalchemy.types import TypeEngine
 from sqlalchemy.dialects.postgresql import ENUM
 
@@ -19,8 +20,7 @@ import traceback
 
 load_dotenv()
 
-REPOS_PATH = os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH']
-repos_path = Path(REPOS_PATH)
+REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
 SKIPHEAD: int = AF_CFGS['skiphead']
 RENAME: dict[str, str] = AF_CFGS['rename']
@@ -38,6 +38,9 @@ DTYPE: dict[str, TypeEngine] = AF_CFGS['dtype']
 VNTGE_VW: str = AF_CFGS['vintage_view_nm']
 # enums that are already defined
 ENUMS: dict[str, str] = AF_CFGS['other_']['enums']
+PRE_SQL: list[str] = AF_CFGS['pre_sql']
+
+LOGGER = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
 
 def data_vintage_timestamp(paths: list[Path]) -> str:
     timestamp_lst: list[float] = [
@@ -90,29 +93,30 @@ def et_(paths: list[Path]) -> Df:
 
         del xl, acct_num, 
 
-    # remove junk columns to avoid column bloat from random junk columns across the source files
+    # Remove junk columns to avoid column bloat
+    #   from random junk columns across the source files.
     use_cols: list[str] = [
         c for c in list(accum_df.columns)
         if not re.findall(r'Unnamed: \d', c)
     ]
 
-    # select down to intended columns and rename
+    # Select down to intended columns and rename.
     accum_df = (
         accum_df[use_cols]
         .convert_dtypes()
         .rename(columns=RENAME)
     )
 
-    # removes junk rows/records
+    # Removes junk rows/records.
     accum_df = accum_df.loc[accum_df[FILTER_FLD].notna()]
 
-    # remap to better values, such as Yes/No to booleans
-    # structure in input config is <column_name>: {<old_value>: <new_value>}
+    # Remap to better values, such as Yes/No to booleans
+    #   structure in input config is <column_name>: {<old_value>: <new_value>}
     #   i.e.: {'call_for_ad': {'Yes': True, 'No': False}
     for c, m in REMAP.items():
         accum_df[c] = accum_df[c].map(m, na_action='ignore')
 
-    # tidy up dtypes
+    # Tidy up dtypes.
     accum_df = accum_df.astype(ASTYPE)
 
     accum_df[DATE_OUT_FLDNM] = accum_df['connected'].dt.date
@@ -120,8 +124,6 @@ def et_(paths: list[Path]) -> Df:
     return accum_df
 
 def main():
-    logger = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
-
     # enums that will need to capture their values from the DF categories
     enums_to_update: dict[str, str] = {
         k: AF_CFGS['fields'][k]['enum_name'] for k in
@@ -133,7 +135,7 @@ def main():
     }
 
     # PARSE PATHS
-    af_files: list[Path] = list(repos_path.rglob(AF_GLOB))
+    af_files: list[Path] = list(REPOS_PATH.rglob(AF_GLOB))
 
     # get data vintage
     tmstmp = data_vintage_timestamp(paths=af_files)
@@ -153,14 +155,16 @@ def main():
             e: ENUM(*list(df[e].cat.categories), name=n)
         })
 
-    # sql to prep db, in this case dropping and replacing enums
-    presql: list[str] = [
+    # SQL queries to prep db.
+    #   In this case dropping and replacing enums and dropping table to replace
+    presql: list[str] = PRE_SQL + [
         ENUM_SQL.format(e)
         for e in enums.keys()
     ]
 
     # add captured enum types with new values to dtype map
-    dtype: dict[str, TypeEngine] = DTYPE.update({k: v for k, v in enums.items()})
+    dtype: dict[str, TypeEngine] =\
+        DTYPE.update({k: v for k, v in enums.items()})
 
     db_load(
         db=DB,
@@ -170,7 +174,7 @@ def main():
         presql=presql,
         xtrasql=xtrasql
     )
-    logger.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
+    LOGGER.info(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {DB.engine}\x1b[0m")
 
 
 if __name__ == "__main__":

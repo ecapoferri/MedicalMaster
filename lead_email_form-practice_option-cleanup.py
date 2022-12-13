@@ -1,10 +1,10 @@
-import re
-from pathlib import Path
 """
 Uses the drop-down list element ('<select>') html
     from html source of the email form page to create a
     newline delimited list to use in the AFDir.xlsx .
 """
+import re
+from pathlib import Path
 SRC = 'lead_email_form-practice_options.html'
 OUT = 'lead_email_form-practice_option-cleanup.txt'
 

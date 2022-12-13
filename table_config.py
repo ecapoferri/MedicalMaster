@@ -251,10 +251,15 @@ AF_FIELDS = {
         enum_name='af_clients_enum'
     )
 }
+AF_TBLNM = 'af_message_data'
 AF_CFGS = TblCfg(
     # for glob or regex
-    src_label=environ['PRMDIA_REPOS_AF_FILE_LABEL']+'*'+environ['PRMDIA_REPOS_AF_FILE_EXT'],
-    tblnm='af_message_data',
+    src_label=(
+        environ['PRMDIA_REPOS_AF_FILE_LABEL']
+        + '*'
+        + environ['PRMDIA_REPOS_AF_FILE_EXT']
+    ),
+    tblnm=AF_TBLNM,
     fields=AF_FIELDS,
     vintage_view_nm='af_message_vntge',
     rename={d['orig']: k for k, d in AF_FIELDS.items() if d['orig']},
@@ -284,7 +289,11 @@ AF_CFGS = TblCfg(
         k: d['astype']
         for k, d in AF_FIELDS.items()
         if d['astype']
-    }
+    },
+    pre_sql=[
+        f"--sql DROP TABLE IF EXISTS {AF_TBLNM} CASCADE;"\
+            .replace('--sql ', '').replace('  ', '')
+    ],
 )
 
 
@@ -480,11 +489,16 @@ INHOUSE_LEADS_OUT_FLDS: dict[str, FldCfg] = {
     ),
 }
 INHOUSE_LEADS_FLDS = INHOUSE_LEADS_SRC_FLDS | INHOUSE_LEADS_OUT_FLDS
+INHOUSE_TBLNM = 'f_lead_email_form'
 INHOUSE_LEADS_CFGS = TblCfg(
-    tblnm='f_lead_email_form',
+    tblnm=INHOUSE_TBLNM,
     src_label=BQ_SQL,
     dtype={k: v['dtype'] for k, v in INHOUSE_LEADS_FLDS.items() if v['dtype']},
     astype={
         k: v['astype'] for k, v in INHOUSE_LEADS_FLDS.items() if v['astype']},
     use_cols=[k for k in INHOUSE_LEADS_SRC_FLDS.keys()],
+    pre_sql=[
+        f"--sql DROP TABLE IF EXISTS {INHOUSE_TBLNM} CASCADE"
+        .replace('--sql ', '')
+    ],
 )

@@ -1,4 +1,7 @@
-# %%
+"""
+Extracts att data from MMS db. Currently deprecated in favor of
+    using email subscription reports.
+"""
 from db_engines import mms_db, wh_db
 
 import pandas as pd
@@ -6,19 +9,16 @@ from pandas import DataFrame as Df
 
 from datetime import datetime, date, timedelta
 
-from table_config import vntge_fmt, vntge_vw_sql, trailing_days, att_cfgs
+from table_config import VNTGE_FMT, VNTGE_VW_SQL, TRAILING_DAYS, ATT_CFGS
 
-# %%
 # CONFIGS
-# %%
-# VALUES
-tblnm: str = att_cfgs['tblnm']
-vntge_vw_nm: str = att_cfgs['vintage_view_nm']
-fields: list[str] = att_cfgs['field_stmts']
+TBLNM: str = ATT_CFGS['TBLNM']
+VNTGE_VW_NM: str = ATT_CFGS['vintage_view_nm']
+FIELDS: list[str] = ATT_CFGS['field_stmts']
 
-df_query_fields: str = ',\n'.join(fields)
+DF_QUERY_FIELDS: str = ',\n'.join(FIELDS)
 
-df_query: str = """--sql
+DF_QUERY: str = """--sql
         SELECT {f}
         FROM att_inbound
         WHERE connected > '{d}'
@@ -27,22 +27,23 @@ df_query: str = """--sql
     """.replace('--sql\n', '')
 
 # ==============================
-q_date_fmt: str = r'%Y-%M-%d'
-now: datetime = datetime.now()
-min_date: date = now.date() - timedelta(days=float(trailing_days))
-min_date_str: str = min_date.strftime(q_date_fmt)
-vntge_ts: str = now.strftime(vntge_fmt)
-# %%
+Q_DATE_FMT: str = r'%Y-%M-%d'
+NOW: datetime = datetime.NOW()
+MIN_DATE: date = NOW.date() - timedelta(days=float(TRAILING_DAYS))
+MIN_DATE_STR: str = MIN_DATE.strftime(Q_DATE_FMT)
+VNTGE_TS: str = NOW.strftime(VNTGE_FMT)
+
+
 def main():
     df: Df
     with mms_db.connect() as conn:
         df = (
                 pd.read_sql_query(
-                    df_query.format(
+                    DF_QUERY.format(
                         # plug in min date
-                        d=min_date_str,
+                        d=MIN_DATE_STR,
                         # plug in columns
-                        f=df_query_fields
+                        f=DF_QUERY_FIELDS
                     ),
                     conn
                 )
@@ -51,11 +52,12 @@ def main():
 
     with wh_db.connect() as conn:
         # update table
-        df.to_sql(tblnm, conn, if_exists='replace', index=False)
+        df.to_sql(TBLNM, conn, if_exists='replace', index=False)
         # create view for data vintage
-        conn.execute(vntge_vw_sql.format(nm=vntge_vw_nm, ts=vntge_ts))
+        conn.execute(VNTGE_VW_SQL.format(nm=VNTGE_VW_NM, ts=VNTGE_TS))
 
-        print(f"\x1b[36;1mSuccessfully loaded {tblnm} to {wh_db.engine}\x1b[0m")
+        print(f"\x1b[36;1mSuccessfully loaded {TBLNM} to {wh_db.engine}\x1b[0m")
+
 
 if __name__ == "__main__":
     main()

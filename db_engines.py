@@ -20,39 +20,42 @@ from table_config import VNTGE_FMT
 load_dotenv()
 
 #Destination WH DB Connection config/s================================>
-wh_port = environ['PRMDIA_POSTGRES_CONT_PORT']
-wh_un = environ['PRMDIA_POSTGRES_CONT_UN']
-wh_pw = environ['PRMDIA_POSTGRES_CONT_PW']
-wh_host = environ['PRMDIA_POSTGRES_CONT_HOST']
-wh_db_name = environ['PRMDIA_POSTGRES_CONT_MM_DB']
-wh_db_name_rprt = environ['PRMDIA_POSTGRES_CONT_RPRT_DB']
+WH_PORT = environ['PRMDIA_POSTGRES_CONT_PORT']
+WH_UN = environ['PRMDIA_POSTGRES_CONT_UN']
+WH_PW = environ['PRMDIA_POSTGRES_CONT_PW']
+WH_HOST = environ['PRMDIA_POSTGRES_CONT_HOST']
+WH_DB_NAME = environ['PRMDIA_POSTGRES_CONT_MM_DB']
+WH_DB_NAME_RPRT = environ['PRMDIA_POSTGRES_CONT_RPRT_DB']
 #<==Destination WH DB Connection config/s=========================<
 
 #MMS/WO=MySQL config/s================================>
-mmswo_un = environ['PRMDIA_SRVR_UN']
-mmswo_pw = environ['PRMDIA_SRVR_PW']
-mmswo_port = environ['PRMDIA_SRVR_DB_PORT']
-mmswo_host = environ['PRMDIA_SRVR_DB_HOST']
-mms_db_name = environ['PRMDIA_SRVR_MMS_DB']
+MMSWO_UN = environ['PRMDIA_SRVR_UN']
+MMSWO_PW = environ['PRMDIA_SRVR_PW']
+MMSWO_PORT = environ['PRMDIA_SRVR_DB_PORT']
+MMSWO_HOST = environ['PRMDIA_SRVR_DB_HOST']
+MMS_DB_NAME = environ['PRMDIA_SRVR_MMS_DB']
 #<==MMS/WO=MySQL config/s=========================<
 
-logger = getLogger(environ['PRMDIA_MM_LOGNAME'])
+LOGGER = getLogger(environ['PRMDIA_MM_LOGNAME'])
 
 #==Connection Engines=============================>
 # connection to wh db
-wh_conn_str, wh_conn_str_rprt = (
-        f"postgresql://{wh_un}:{wh_pw}@{wh_host}:{wh_port}/{n}"
-        for n in (wh_db_name, wh_db_name_rprt)
+WH_CONN_STR, WH_CONN_STR_RPRT = (
+        f"postgresql://{WH_UN}:{WH_PW}@{WH_HOST}:{WH_PORT}/{n}"
+        for n in (WH_DB_NAME, WH_DB_NAME_RPRT)
     )
-wh_db: Engine
-rprt_db: Engine
-wh_db, rprt_db = (
+WH_DB: Engine
+RPRT_DB: Engine
+WH_DB, RPRT_DB = (
         create_engine(s) for s in
-        (wh_conn_str, wh_conn_str_rprt)
+        (WH_CONN_STR, WH_CONN_STR_RPRT)
     )
 # connections to primedia dbs
-mms_conn_str = f"mysql+mysqldb://{mmswo_un}:{mmswo_pw}@{mmswo_host}:{mmswo_port}/{mms_db_name}"
-mms_db = create_engine(mms_conn_str)
+MMS_CONN_STR =(
+    f"mysql+mysqldb://{MMSWO_UN}:{MMSWO_PW}@{MMSWO_HOST}:"
+    + f"{MMSWO_PORT}/{MMS_DB_NAME}"
+)
+MMS_DB = create_engine(MMS_CONN_STR)
 #<==Connection Engines===========================<
 
 def db_load(
@@ -99,23 +102,25 @@ def fs_tmstmp(path_: Path) -> str:
 
 
 def check_connection(db_: Engine):
-    """Checks that connection exists. Uses a basic query, not dependend on data in the DB.
+    """Checks that connection exists.
+        Uses a basic query, not dependend on data in the DB.
 
     Args:
         db_ (Engine): sqlalchemy connection engine to check
 
     Raises:
         Exception: Try/Except excepts MySQLdb._exceptions.OperationalError
-            (asliased as 'MySQL_OpErr'). Raises basic exception to stop execution if that's the case.
+            (asliased as 'MySQL_OpErr').
+            Raises basic exception to stop execution if that's the case.
     """
     with db_.connect() as conn:
         try:
-            logger.info(f"Checking {db_.engine} -->")
+            LOGGER.info(f"Checking {db_.engine} -->")
             rows: list[Row] = conn.execute(
                 "SELECT 'Hello There' AS greeting;").all()
             rows_str: list[str] = [f"\t{r}" for r in rows]
-            logger.info('\n'.join(rows_str))
-            logger.info(f"--> \x1b[32m{db_.engine} \x1b[1m✔️\x1b[0m\n")
+            LOGGER.info('\n'.join(rows_str))
+            LOGGER.info(f"--> \x1b[32m{db_.engine} \x1b[1m✔️\x1b[0m\n")
         except MySQL_OpErr:
             raise Exception(
                 f"\x1b[91mLooks Like a problem with your connection to {db_.name};\x1b[0m\nSee below:\n\n{traceback.format_exc()}\n"

@@ -1,3 +1,8 @@
+"""
+Translates the spreadsheet with client identifying values (name in AF,
+    name in lead email form, AF practice id, etc) used to map identifiers
+    to practice id.
+"""
 import pandas as pd
 from pandas import Series as Ser, DataFrame as Df
 
@@ -44,7 +49,12 @@ CLIENT_MASTER_SHEET_NAME = 'master'
 
 PHONE_MAP_SHEET_NAME = 'phone_map'
 
-TBLNM: dict[str, str] =  {"tblnm": os_environ['PRMDIA_MM_CLIENT_MAP_TBLNM']}
+TBLNM = os_environ['PRMDIA_MM_CLIENT_MAP_TBLNM']
+TBLNM_D: dict[str, str] = {'tblnm': TBLNM}
+
+PRE_SQL = {
+    'pre_sql': [
+        f"--sql DROP TABLE IF EXISTS {TBLNM} CASCADE".replace('--sql ', '')]}
 
 json_out = Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH'])
 phone_out = Path(os_environ['PRMDIA_MM_PHONE_MAP_PTH'])
@@ -70,7 +80,7 @@ def main():
         } for col_key, col in client_map.to_dict().items()
     }
 
-    out_dict = TBLNM | AS_TYPE | {"map": map_}
+    out_dict = TBLNM_D | AS_TYPE | PRE_SQL | {"map": map_}
 
     json_out.write_text(json.dumps(obj=out_dict))
 

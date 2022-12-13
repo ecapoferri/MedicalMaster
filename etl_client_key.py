@@ -1,5 +1,5 @@
 #Headers
-from db_engines import wh_db as DB
+from db_engines import WH_DB as DB
 import logging, traceback
 from os import environ as os_environ
 from dotenv import load_dotenv
@@ -11,14 +11,12 @@ load_dotenv()
 
 # Unpack Config
 LOGGER = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
-
 CONFIG: dict[str, str|int] = json_loads(
     Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())
 
 TBLNM: str = CONFIG['tblnm']
-
 ASTYPE: dict[str, str] = CONFIG['astype']
-
+PRE_SQL: list[str] = CONFIG['pre_sql']
 DF_KEY = 'map'
 
 def main():
@@ -29,6 +27,8 @@ def main():
     )
 
     with DB.connect() as conn:
+        for s in PRE_SQL:
+            conn.execute(s)
         df.to_sql(
             name=TBLNM,
             con=conn,
