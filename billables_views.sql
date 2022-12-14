@@ -1,7 +1,8 @@
 DROP VIEW IF EXISTS gather_billables CASCADE;
-CREATE OR REPLACE VIEW gather_billables AS
 -- Gather billables from AF and email data.
+CREATE OR REPLACE VIEW gather_billables AS
     SELECT
+        -- Answer First data
         acct af_acct,
         CASE WHEN practice_id IS NOT NULL THEN call_date ELSE NULL END
             lead_delivery_date,
@@ -12,6 +13,7 @@ CREATE OR REPLACE VIEW gather_billables AS
         connected processed,
 
         history af_logs,
+        dispo af_dispo,
 
         'AF' delivery_code
     FROM
@@ -21,6 +23,7 @@ CREATE OR REPLACE VIEW gather_billables AS
         AND practice_id != 0
         AND callerid IS NOT NULL
 UNION ALL
+    -- Email form data
     SELECT
         af_acct,
         lead_delivery_date,
@@ -31,6 +34,7 @@ UNION ALL
         submitted processed,
 
         NULL af_logs,
+        NULL af_dispo,
 
         'IH' delivery_code
 
@@ -60,6 +64,8 @@ SELECT
 
     b.practice_id,
     p.af_practice,
+    p.lead_ref_id client_lead_id,
+    p.lead_company client_comp_name,
 
     b.lead_delivery_date,
     b.caller_phone,
@@ -67,16 +73,17 @@ SELECT
     b.delivery_code,
 
     b.processed,
+    b.af_dispo,
     b.af_logs
 
 FROM
     att_data a
+    -- Not using gather_billables_all because this is just to join AF to ATT
     FULL OUTER JOIN gather_billables b
         ON b.callerid = a.number_orig
         AND b.af_acct::INTEGER = a.acct_af
     LEFT JOIN d_practice p ON b.practice_id = p.practice_id
 
--- WHERE a.connected > '2022-12-4'
 ORDER BY att_connected
 ;
 
@@ -84,46 +91,49 @@ DROP VIEW IF EXISTS medical_master CASCADE;
 -- Mimics the medical master, groups by att ids.
 CREATE OR REPLACE VIEW medical_master AS
 SELECT
-    call_date,
+    att_af_acct "AF Group",
+    call_date "Connect Date",
+    att_connected::TIME "Connect Time",
+    att_callerid "Caller Number",
+    toll_af_acct "Toll Dialed",
+    att_caller_state,
 
-    att_connected,
-    NULLIF(array_remove(array_agg(DISTINCT(att_callerid)), NULL), '{}')
-        att_callerids,
-    NULLIF(array_remove(array_agg(DISTINCT(toll_af_acct)), NULL), '{}')
-        toll_af_accts,
-
-    NULLIF(array_remove(array_agg(DISTINCT(att_af_acct)), NULL), '{}')
-        att_af_accts,
-    NULLIF(array_remove(array_agg(DISTINCT(att_caller_state)), NULL), '{}')
-        att_caller_states,
-
+    NULLIF(array_remove(array_agg(DISTINCT(delivery_code)), NULL), '{}')
+        "Deliveries",
     NULLIF(array_remove(array_agg(DISTINCT(practice_id)), NULL), '{}')
         practice_ids,
     NULLIF(array_remove(array_agg(DISTINCT(af_practice)), NULL), '{}')
-        af_practices,
-
+        "Clients",
+    NULLIF(array_remove(array_agg(DISTINCT(client_lead_id)), NULL), '{}')
+        client_lead_ids,
+    NULLIF(array_remove(array_agg(DISTINCT(client_comp_name)), NULL), '{}')
+        client_comp_name,
+    NULLIF(array_remove(array_agg(DISTINCT(caller_phone)), NULL), '{}')
+        "Caller Phone Number (Given)",
+    NULLIF(array_remove(array_agg(DISTINCT(caller_name)), NULL), '{}')
+        "Caller Name",
     NULLIF(array_remove(array_agg(DISTINCT(lead_delivery_date)), NULL), '{}')
         lead_delivery_dates,
-    NULLIF(array_remove(array_agg(DISTINCT(caller_phone)), NULL), '{}')
-        caller_phones,
-    NULLIF(array_remove(array_agg(DISTINCT(caller_name)), NULL), '{}')
-        caller_names,
-    NULLIF(array_remove(array_agg(DISTINCT(delivery_code)), NULL), '{}')
-        delivery_codes,
 
     NULLIF(array_remove(array_agg(DISTINCT(processed)), NULL), '{}')
         processed,
+    NULLIF(array_remove(array_agg(DISTINCT(af_dispo)), NULL), '{}')
+        af_dispos,
     NULLIF(array_remove(array_agg(DISTINCT(af_logs)), NULL), '{}')
         af_logs_
 FROM
     join_billables
 GROUP BY
     call_date,
-    att_connected
+    att_connected,
+    att_af_acct,
+    att_callerid,
+    toll_af_acct,
+    att_caller_state
 ;
 
--- Shows all billables, including those imported from the old medical master.
 DROP VIEW IF EXISTS gather_billables_all CASCADE;
+-- Shows all billables, including those imported from the old medical master.
 CREATE OR REPLACE VIEW gather_billables_all AS
     SELECT
         af_acct,
@@ -133,6 +143,7 @@ CREATE OR REPLACE VIEW gather_billables_all AS
         caller_name,
         processed,
         delivery_code,
+        NULL af_dispo,
         NULL af_logs,
         NULL caller_phone
     FROM prior_billables
@@ -146,6 +157,7 @@ UNION ALL
         caller_name,
         processed,
         delivery_code,
+        af_dispo,
         af_logs,
         caller_phone
     FROM gather_billables
@@ -154,27 +166,34 @@ ORDER BY lead_delivery_date
 ;
 
 DROP VIEW IF EXISTS unique_billables CASCADE;
+-- Compiles billables, group by will collect duplicate callers to the
+--      same practice into one record to prevent double billing
+--      for the same person
 CREATE OR REPLACE VIEW unique_billables AS
 SELECT
     MIN(b.lead_delivery_date)
         first_lead_delivery_date,
     b.af_acct,
-    b.practice_id,
-    p.af_practice,
     b.callerid,
-    NULLIF(array_remove(array_agg(DISTINCT(b.caller_phone)), NULL), '{}')
-        caller_phones,
     NULLIF(array_remove(array_agg(DISTINCT(b.caller_name)), NULL), '{}')
         caller_names,
+    b.practice_id,
+    p.af_practice,
+    NULLIF(array_remove(array_agg(DISTINCT(b.caller_phone)), NULL), '{}')
+        caller_phones,
     NULLIF(array_remove(array_agg(DISTINCT(b.lead_delivery_date)), NULL), '{}')
         lead_delivery_dates,
     NULLIF(array_remove(array_agg(DISTINCT(b.delivery_code)), NULL), '{}')
         delivery_codes,
     NULLIF(array_remove(array_agg(DISTINCT(b.processed)), NULL), '{}')
-        processed
+        processed,
+    NULLIF(array_remove(array_agg(DISTINCT(b.af_dispo)), NULL), '{}')
+        af_dispos,
+    NULLIF(array_remove(array_agg(DISTINCT(b.af_logs)), NULL), '{}')
+        af_logs
+    
 FROM gather_billables_all b
     LEFT JOIN d_practice p ON b.practice_id = p.practice_id
 GROUP BY b.af_acct, b.callerid, b.practice_id, p.af_practice
--- HAVING MIN(lead_delivery_date) > '2022-12-4'
 ORDER BY first_lead_delivery_date DESC
 ;
