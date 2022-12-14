@@ -1,3 +1,4 @@
+# FIXME: DOCTSTRING
 # IMPORTS
 import logging
 import traceback
@@ -5,8 +6,6 @@ from os import environ as os_environ, system as os_system
 from sys import stdout
 
 from datetime import datetime, timedelta
-from pandas import DataFrame as Df
-import pandas as pd
 
 from pathlib import Path
 from threading import Thread
@@ -59,29 +58,9 @@ LOGGER.addHandler(hdlr)
 LOGGER.setLevel(logging.INFO)
 
 
-def primedia_phone_numbers() -> list[int]:
-    # Load pm phone numbers.
-    pm_phone: Df
-    with RPRT_DB.connect() as conn:
-        pm_phone = pd.read_sql_query(
-            sql="""--sql
-                SELECT phone_dir FROM dim_phone;
-            """.replace('--sql\n', ''),
-            con=conn
-        )
-    pm_phones: list[int] = list(pm_phone['phone_dir'])
-
-    # Create string for query.
-    ph_not_in: str = ', '.join([str(i) for i in pm_phones])
-
-    log_msg = ', '.join([str(i) for i in pm_phones])
-    LOGGER.debug(f"PM phone nums excluded: \n{log_msg}")
-    del log_msg
-    return pm_phones
-
-
 def db_connection_check():
     # Check for active connections, else raise exception and bail.
+    # FIXME: DOCTSTRING
     for d in DB, RPRT_DB:
         try:
             check_connection(d)
@@ -95,6 +74,7 @@ def db_connection_check():
 
 def check_repo_vintages():
     # DATA LAKE VINTAGE CHECK
+    # FIXME: DOCTSTRING
     ansi = '\x1b[{clr}m'
     good_ansi = '93'
     bad_ansi = '1;91'
@@ -134,9 +114,9 @@ def check_repo_vintages():
 
 
 def main():
+    # FIXME: DOCTSTRING
     db_connection_check()
     check_repo_vintages()
-    df_pm_phones = primedia_phone_numbers()
 
     att_thr = Thread(target=att)
     af_thr = Thread(target=af)
