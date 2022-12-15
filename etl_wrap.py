@@ -1,4 +1,7 @@
-# FIXME: DOCTSTRING
+"""
+Used to extrack data from ATT and AnswerFirst reporting files in
+    the lake repos and load to data sink DB for production.
+"""
 # IMPORTS
 import logging
 import traceback
@@ -25,22 +28,24 @@ import dotenv
 
 dotenv.load_dotenv()
 
-# OTHER CONSTANTS
+########## CONFIG CONSTANTS ##########
+# Date string formats for the data vintage timestamp and SQL query dates.
 TMSTMP_FMT: str = r'%Y-%m-%d %H:%M:%S'
 QUERY_DATE_FMT: str = r'%Y-%m-%d'
 
-TODAY: str = datetime.now().strftime(QUERY_DATE_FMT)
 REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
 
+TODAY: str = datetime.now().strftime(QUERY_DATE_FMT)
 # Command to restore views after the table truncate inserts.
 XTRA_SQL_FILE = 'billables_views.sql'
 PSQL_CMD: str = f"psql --file={XTRA_SQL_FILE} {WH_CONN_STR}"
-
+# Glob strings to locate the relevant files in the lake repository.
 AF_GLOB: str = AF_CFGS['src_label']
 ATT_GLOB: str = ATT_FILE_CFG['src_label']
+# Number of recent files to check for mtimes.
 REPO_CHECK_RNG = 5
 
-# LOGGING SETUP
+########## LOGGING SETUP ##########
 LOG_FMT_DATE_STRM = r'%y%m%d|%H%M'
 LOG_FMT_DATE_FILE = r'%Y-%m-%d %H:%M:%S'
 LOG_FMT_FILE =\
@@ -59,8 +64,13 @@ LOGGER.setLevel(logging.INFO)
 
 
 def db_connection_check():
-    # Check for active connections, else raise exception and bail.
-    # FIXME: DOCTSTRING
+    """Checks for active database connection. If the query is
+        unsuccessful, we bail on executing
+        the module.
+
+    Raises:
+        Exception: If the query is unsuccessful.
+    """
     for d in DB, RPRT_DB:
         try:
             check_connection(d)
@@ -73,8 +83,10 @@ def db_connection_check():
 
 
 def check_repo_vintages():
-    # DATA LAKE VINTAGE CHECK
-    # FIXME: DOCTSTRING
+    """Checks vintages of <RNG> most recent files in the lake repository.
+        Prints log messages which are color coded based on recency so
+        the user can quickly check whether daily reports subscriptions
+        are flowing."""
     ansi = '\x1b[{clr}m'
     good_ansi = '93'
     bad_ansi = '1;91'
@@ -114,7 +126,6 @@ def check_repo_vintages():
 
 
 def main():
-    # FIXME: DOCTSTRING
     db_connection_check()
     check_repo_vintages()
 

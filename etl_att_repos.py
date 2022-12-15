@@ -170,12 +170,12 @@ def main():
 
     # get data vintage and append sql query to create view
     vntge: datetime = get_latest_vntge(path_list)
-    xtrasql: list[str] = XTRASQL.append(
-            VNTGE_VW_SQL.format(
-                nm=VNTGE_VW,
-                ts=vntge.strftime(VNTGE_FMT)
-            )
+    xtrasql: list[str] = XTRASQL + [
+        VNTGE_VW_SQL.format(
+            nm=VNTGE_VW,
+            ts=vntge.strftime(VNTGE_FMT)
         )
+    ]
 
     # df = read_append(path_list=path_list).pipe(clean)
     # read in from source files

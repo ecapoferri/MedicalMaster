@@ -1,5 +1,5 @@
 """
-Extracts att data from MMS db. Currently deprecated in favor of
+Extracts att data from MMS/dmp db. Currently deprecated in favor of
     using email subscription reports.
 """
 from db_engines import mms_db, wh_db
