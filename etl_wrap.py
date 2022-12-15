@@ -138,7 +138,9 @@ def main():
 
     # Re-instate views after truncate-inserts.
     #   (which involve DROP ... <table|view> CASCADE queries).
-    LOGGER.info(f"Re-instating master join view.")
+    LOGGER.info(
+        f"Re-instating SQL views (replacing after 'DROP ... CASCADE' preparation queries)."
+    )
     os_system(PSQL_CMD)
     return
 
