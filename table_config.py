@@ -1,15 +1,31 @@
-from typing import\
-    NewType,\
-    TypedDict,\
-    Optional
+import logging
+import traceback
 
-from sqlalchemy.types import TypeEngine
-from sqlalchemy.dialects.postgresql import INTEGER, BIGINT, BOOLEAN, VARCHAR, TEXT, ENUM, INTERVAL, TIMESTAMP, DATE
+import configparser
+from os import chdir
+from os import environ as os_environ
+from pathlib import Path
+from time import perf_counter
+from typing import NewType, Optional, TypedDict
 
-from os import environ
 from dotenv import load_dotenv
-load_dotenv()
+from sqlalchemy.dialects.postgresql import (BIGINT, BOOLEAN, DATE, ENUM,
+                                            INTEGER, INTERVAL, TEXT, TIMESTAMP,
+                                            VARCHAR)
+from sqlalchemy.types import TypeEngine
 
+START = perf_counter()
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
 # custom types aliased for easy for name hints
 AsType = NewType('PandasAsType | StypeStr', [type | str])
 DType = NewType('SQLAlchemyDType', TypeEngine)
@@ -91,7 +107,7 @@ ENUM_SQL = """
         DROP TYPE IF EXISTS {} CASCADE;
     """
 
-VNTGE_FMT: str = r'%Y-%m-%d %H:%M:%S'
+VNTGE_FMT: str = config['PM']['VNTGE_FMT']
 
 
 # ATT - for a simple query to mms
@@ -114,7 +130,11 @@ ATT_CFGS: dict[str, dict|str] = {
 }
 
 STATE_LIST: list[str] = [
-    'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA', 'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UM', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'
+    'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA',
+    'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME',
+    'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM',
+    'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX',
+    'UM', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY',
 ]
 # ANSWER FIRST
 AF_FIELDS = {
@@ -255,9 +275,9 @@ AF_TBLNM = 'af_message_data'
 AF_CFGS = TblCfg(
     # for glob or regex
     src_label=(
-        environ['PRMDIA_REPOS_AF_FILE_LABEL']
+        config['ANSWER_FIRST']['AF_FILE_LABEL']
         + '*'
-        + environ['PRMDIA_REPOS_AF_FILE_EXT']
+        + config['ANSWER_FIRST']['AF_FILE_EXT']
     ),
     tblnm=AF_TBLNM,
     fields=AF_FIELDS,
@@ -502,3 +522,5 @@ INHOUSE_LEADS_CFGS = TblCfg(
         .replace('--sql ', '')
     ],
 )
+chdir(CWD)
+LOGGER.debug(f"{__name__} execution time: {START - perf_counter():.4f}")

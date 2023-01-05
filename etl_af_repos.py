@@ -1,26 +1,43 @@
 # HEADERS
+import configparser
+import logging
+import re
+import traceback
 from datetime import datetime
+from os import chdir
 from os import environ as os_environ
 from pathlib import Path
-from dotenv import load_dotenv
+from time import perf_counter
 
 import pandas as pd
+from dotenv import load_dotenv
 from pandas import DataFrame as Df
-
-from table_config import\
-    AF_CFGS, VNTGE_VW_SQL, VNTGE_FMT, ENUM_SQL, DATE_OUT_FLDNM
-from db_engines import WH_DB as DB, db_load
-from sqlalchemy.types import TypeEngine
 from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.types import TypeEngine
 
-import re
+from db_engines import WH_DB as DB
+from db_engines import db_load
+from logging_setup import HDLR
+from table_config import (AF_CFGS, DATE_OUT_FLDNM, ENUM_SQL, VNTGE_FMT,
+                          VNTGE_VW_SQL)
 
-from logging import getLogger
-import traceback
+START = perf_counter()
+load_dotenv('./.env')
+load_dotenv('../.env')
 
-load_dotenv()
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
 
-REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+
+VNTGE_FMT = config['PM']['VNTGE_FMT']
+
+REPOS_PATH = Path(config['PM']['LOCAL_STORAGE'])
 
 SKIPHEAD: int = AF_CFGS['skiphead']
 RENAME: dict[str, str] = AF_CFGS['rename']
@@ -40,7 +57,7 @@ VNTGE_VW: str = AF_CFGS['vintage_view_nm']
 ENUMS: dict[str, str] = AF_CFGS['other_']['enums']
 PRE_SQL: list[str] = AF_CFGS['pre_sql']
 
-LOGGER = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+LOGGER = logging.getLogger(f"{config['DEFAULT']['LOGGER_NAME']}")
 
 def data_vintage_timestamp(paths: list[Path]) -> str:
     timestamp_lst: list[float] = [
@@ -52,7 +69,7 @@ def data_vintage_timestamp(paths: list[Path]) -> str:
 
 def load_xls_sheet(f: Path, skiphead) -> Df:
     xl = pd.ExcelFile(f)
-    load_df: Df
+    load_df = Df()
     for sh in xl.sheet_names:
         load_df = pd.concat([
             load_df,
@@ -90,8 +107,6 @@ def et_(paths: list[Path]) -> Df:
                 for sh in xl.sheet_names
             ]
         ])
-
-        del xl, acct_num, 
 
     # Remove junk columns to avoid column bloat
     #   from random junk columns across the source files.
@@ -178,4 +193,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        LOGGER.addHandler(HDLR)
+        LOGGER.setLevel(logging.DEBUG)
+        main()
+    finally:
+        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+        HDLR.close()
+
+chdir(CWD)

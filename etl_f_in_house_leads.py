@@ -1,22 +1,40 @@
-from google.cloud import bigquery
-
+import configparser
 import json
-from pandas import DataFrame as Df, Series as Ser
-import pandas as pd
-
-from pathlib import Path
-from os import environ as os_environ
-from dotenv import load_dotenv
 import logging
 import traceback
+from os import chdir
+from os import environ as os_environ
+from pathlib import Path
+from time import perf_counter
 
-from table_config import INHOUSE_LEADS_TIMESTAMP_FLDNM as TIMESTAMP_FLDNM,\
-    CALLERID_FLDNM, INHOUSE_LEADS_CFGS as CFGS,\
-    INHOUSE_LEAD_DATE_FLDNM as DATE_FLDNM
+import pandas as pd
+from dotenv import load_dotenv
+from google.cloud import bigquery
+from pandas import DataFrame as Df
+from pandas import Series as Ser
 
 from db_engines import WH_DB as DB
+from logging_setup import HDLR
+from table_config import CALLERID_FLDNM
+from table_config import INHOUSE_LEAD_DATE_FLDNM as DATE_FLDNM
+from table_config import INHOUSE_LEADS_CFGS as CFGS
+from table_config import INHOUSE_LEADS_TIMESTAMP_FLDNM as TIMESTAMP_FLDNM
 
-load_dotenv()
+START = perf_counter()
+
+
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
 CLIENT_KEY: dict = json.loads(
     Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())['map']
 CLIENT_KEY_USECOLS: list[str] = ['practice_id', 'lead_email_form']
@@ -96,4 +114,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        LOGGER.addHandler(HDLR)
+        LOGGER.setLevel(logging.DEBUG)
+        main()
+    finally:
+        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+        HDLR.close()
+
+chdir(CWD)

@@ -1,28 +1,43 @@
-# HEADERS
-from datetime import datetime, timedelta
-import pandas as pd
-from pandas import DataFrame as Df
-
-from pathlib import Path
-from io import BytesIO
+import configparser
 import gzip
-import re
 import json
-
+import logging
+import re
+import traceback
+from datetime import datetime, timedelta
+from io import BytesIO
+from logging import getLogger
+from os import chdir
 from os import environ as os_environ
-from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+from time import perf_counter
 
+import pandas as pd
+from dotenv import load_dotenv
+from pandas import DataFrame as Df
 from sqlalchemy.types import TypeEngine
 
-from table_config import ATT_FILE_CFG, VNTGE_VW_SQL, VNTGE_FMT, DATE_OUT_FLDNM
-from db_engines import db_load, WH_DB as DB
+from db_engines import WH_DB as DB
+from db_engines import db_load
+from logging_setup import HDLR
+from table_config import ATT_FILE_CFG, DATE_OUT_FLDNM, VNTGE_FMT, VNTGE_VW_SQL
 
-from logging import getLogger
+START = perf_counter()
 
-REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
+load_dotenv('./.env')
+load_dotenv('../.env')
 
-PHONE_PATH = os_environ['PRMDIA_MM_PHONE_MAP_PTH']
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+
+
+REPOS_PATH = config['PM']['LOCAL_STORAGE_REL_PATH']
+
+PHONE_PATH = config['INTERNAL_RESOURCES']['PHONE_MAP_FILE']
 
 USE_COLS: list[str | int] = ATT_FILE_CFG['use_cols']
 RENAME: dict[str, str] = ATT_FILE_CFG['rename']
@@ -65,6 +80,7 @@ PRESQL: list[str] = ATT_FILE_CFG['pre_sql']
 XTRASQL: list[str] = ATT_FILE_CFG['xtra_sql']
 VNTGE_VW: str = ATT_FILE_CFG['vintage_view_nm']
 
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
 
 def get_toll_map() -> dict:
     phone_path = Path(PHONE_PATH)
@@ -164,9 +180,9 @@ def clean(df__: Df):
 
 
 def main():
-    path_list: list[Path] = list(REPOS_PATH.rglob(FILE_RGLOB))
+    path_list: list[Path] = list(Path(REPOS_PATH).rglob(FILE_RGLOB))
 
-    LOGGER = getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+    LOGGER = getLogger(f"{config['DEFAULT']['LOGGER_NAME']}")
 
     # get data vintage and append sql query to create view
     vntge: datetime = get_latest_vntge(path_list)
@@ -202,4 +218,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        LOGGER.addHandler(HDLR)
+        LOGGER.setLevel(logging.DEBUG)
+        main()
+    finally:
+        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+
+chdir(CWD)

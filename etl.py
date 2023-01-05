@@ -2,65 +2,66 @@
 Used to extrack data from ATT and AnswerFirst reporting files in
     the lake repos and load to data sink DB for production.
 """
-# IMPORTS
+import configparser
 import logging
 import traceback
-from os import environ as os_environ, system as os_system
-from sys import stdout
-
 from datetime import datetime, timedelta
-
+from os import chdir
+from os import environ as os_environ
+from os import system as os_system
 from pathlib import Path
+from sys import stdout
 from threading import Thread
-
-# For verifying DB updates.
-from db_engines import RPRT_DB, WH_CONN_STR, WH_DB as DB,\
-    MySQL_OpErr, check_connection
-# Configuration dictionaries for ETL of certain downstream tables.
-from table_config import AF_CFGS, ATT_FILE_CFG
-# Individual ETL functions.
-from etl_att_repos import main as att
-from etl_af_repos import main as af
-from etl_client_key import main as client
-from etl_f_in_house_leads import main as inhouse
+from time import perf_counter
 
 import dotenv
+from dotenv import load_dotenv
 
-dotenv.load_dotenv()
+# For verifying DB updates.
+from db_engines import RPRT_DB
+from db_engines import WH_DB as DB
+from db_engines import MySQL_OpErr, check_connection
+from etl_af_repos import main as af
+# Individual ETL functions.
+from etl_att_repos import main as att
+from etl_client_key import main as client
+from etl_f_in_house_leads import main as inhouse
+from logging_setup import HDLR
+# Configuration dictionaries for ETL of certain downstream tables.
+from table_config import AF_CFGS, ATT_FILE_CFG
+
+START = perf_counter()
+
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
 
 ########## CONFIG CONSTANTS ##########
 # Date string formats for the data vintage timestamp and SQL query dates.
 TMSTMP_FMT: str = r'%Y-%m-%d %H:%M:%S'
 QUERY_DATE_FMT: str = r'%Y-%m-%d'
 
-REPOS_PATH = Path(os_environ['PRMDIA_EVAN_LOCAL_LAKEPATH'])
+REPOS_PATH = Path(config['PM']['LOCAL_STORAGE'])
 
 TODAY: str = datetime.now().strftime(QUERY_DATE_FMT)
 # Command to restore views after the table truncate inserts.
-XTRA_SQL_FILE = 'billables_views.sql'
-PSQL_CMD: str = f"psql --file={XTRA_SQL_FILE} {WH_CONN_STR}"
-# Glob strings to locate the relevant files in the lake repository.
+XTRA_SQL = Path('billables_views.sql').read_text()
+
 AF_GLOB: str = AF_CFGS['src_label']
 ATT_GLOB: str = ATT_FILE_CFG['src_label']
 # Number of recent files to check for mtimes.
 REPO_CHECK_RNG = 5
 
-########## LOGGING SETUP ##########
-LOG_FMT_DATE_STRM = r'%y%m%d|%H%M'
-LOG_FMT_DATE_FILE = r'%Y-%m-%d %H:%M:%S'
-LOG_FMT_FILE =\
-    '%(asctime)s [%(name)s,%(funcName)s,%(module)s::%(levelname)s]>>%(message)s'
-LOG_FMT_STRM =\
-    '\x1b[32m%(asctime)s[%(name)s %(levelname)s]\x1b[0m >> %(message)s'
-
 LOGGER = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
-hdlr = logging.StreamHandler(stdout)
-hdlr.setFormatter(
-    logging.Formatter(
-        fmt=LOG_FMT_STRM, datefmt=LOG_FMT_DATE_STRM))
-# hdlr.setLevel(logging.DEBUG)
-LOGGER.addHandler(hdlr)
-LOGGER.setLevel(logging.INFO)
 
 
 def db_connection_check():
@@ -152,9 +153,19 @@ def main():
     LOGGER.info(
         f"Re-instating SQL views (replacing after 'DROP ... CASCADE' preparation queries)."
     )
-    os_system(PSQL_CMD)
+    with DB.connect() as conn:
+        conn.execute(XTRA_SQL)
+
     return
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        LOGGER.addHandler(HDLR)
+        LOGGER.setLevel(logging.DEBUG)
+        main()
+    finally:
+        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+        HDLR.close()
+
+chdir(CWD)

@@ -1,42 +1,54 @@
-from sqlite3 import Row
-from typing import Iterable
-from sqlalchemy import create_engine
-from sqlalchemy.types import TypeEngine
-from sqlalchemy.engine.base import Engine  # for type hints
-from MySQLdb._exceptions import OperationalError as MySQL_OpErr
-
+import configparser
 import traceback
-from logging import getLogger, Logger, info, debug, error
-
-from os import environ
-from dotenv import load_dotenv
-from pathlib import Path
 from datetime import datetime
+from logging import Logger, debug, error, getLogger, info
+from os import chdir
+from os import environ as os_environ
+from pathlib import Path
+from sqlite3 import Row
+from time import perf_counter
+from typing import Iterable
 
+from dotenv import load_dotenv
+from MySQLdb._exceptions import OperationalError as MySQL_OpErr
 from pandas import DataFrame as Df
+from sqlalchemy import create_engine
+from sqlalchemy.engine.base import Engine  # for type hints
+from sqlalchemy.types import TypeEngine
 
-from table_config import VNTGE_FMT
 
-load_dotenv()
+START = perf_counter()
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = getLogger(config['DEFAULT']['LOGGER_NAME'])
+
+VNTGE_FMT = config['PM']['VNTGE_FMT']
 
 #Destination WH DB Connection config/s================================>
-WH_PORT = environ['PRMDIA_POSTGRES_CONT_PORT']
-WH_UN = environ['PRMDIA_POSTGRES_CONT_UN']
-WH_PW = environ['PRMDIA_POSTGRES_CONT_PW']
-WH_HOST = environ['PRMDIA_POSTGRES_CONT_HOST']
-WH_DB_NAME = environ['PRMDIA_POSTGRES_CONT_MM_DB']
-WH_DB_NAME_RPRT = environ['PRMDIA_POSTGRES_CONT_RPRT_DB']
+WH_PORT = config['PGSQL']['PORT']
+WH_UN = os_environ['PRMDIA_POSTGRES_CONT_UN']
+WH_PW = os_environ['PRMDIA_POSTGRES_CONT_PW']
+WH_HOST = config['PGSQL']['HOST']
+WH_DB_NAME = config['PGSQL']['MM_DB']
+WH_DB_NAME_RPRT = config['PGSQL']['MM_DB']
 #<==Destination WH DB Connection config/s=========================<
 
 #MMS/WO=MySQL config/s================================>
-MMSWO_UN = environ['PRMDIA_SRVR_UN']
-MMSWO_PW = environ['PRMDIA_SRVR_PW']
-MMSWO_PORT = environ['PRMDIA_SRVR_DB_PORT']
-MMSWO_HOST = environ['PRMDIA_SRVR_DB_HOST']
-MMS_DB_NAME = environ['PRMDIA_SRVR_MMS_DB']
+MMSWO_UN = os_environ['PRMDIA_SRVR_UN']
+MMSWO_PW = os_environ['PRMDIA_SRVR_PW']
+MMSWO_PORT = config['MYSQL']['PORT']
+MMSWO_HOST = config['MYSQL']['HOST']
+MMS_DB_NAME = config['MYSQL']['MMS_DB']
 #<==MMS/WO=MySQL config/s=========================<
-
-LOGGER = getLogger(environ['PRMDIA_MM_LOGNAME'])
 
 #==Connection Engines=============================>
 # connection to wh db
@@ -147,3 +159,5 @@ def vintage_check(path_: str | Path) -> tuple[datetime | str]:
     dt = datetime.fromtimestamp(pth.stat().st_mtime)
 
     return (dt, dt.strftime(VNTGE_FMT))
+
+chdir(CWD)

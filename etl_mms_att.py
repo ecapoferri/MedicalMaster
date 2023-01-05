@@ -2,14 +2,37 @@
 Extracts att data from MMS/dmp db. Currently deprecated in favor of
     using email subscription reports.
 """
-from db_engines import mms_db, wh_db
+import configparser
+import logging
+import traceback
+from datetime import date, datetime, timedelta
+from os import chdir
+from os import environ as os_environ
 
 import pandas as pd
+from dotenv import load_dotenv
 from pandas import DataFrame as Df
 
-from datetime import datetime, date, timedelta
+from db_engines import mms_db, wh_db
+from logging_setup import HDLR
+from table_config import ATT_CFGS, TRAILING_DAYS, VNTGE_FMT, VNTGE_VW_SQL
+from time import perf_counter
+from pathlib import Path
 
-from table_config import VNTGE_FMT, VNTGE_VW_SQL, TRAILING_DAYS, ATT_CFGS
+START = perf_counter()
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+
 
 # CONFIGS
 TBLNM: str = ATT_CFGS['TBLNM']

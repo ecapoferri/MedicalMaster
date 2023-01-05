@@ -1,27 +1,44 @@
-#Headers
-from db_engines import WH_DB as DB
-import logging, traceback
-from os import environ as os_environ
-from dotenv import load_dotenv
+import configparser
+import logging
+import traceback
 from json import loads as json_loads
+from os import chdir
+from os import environ as os_environ
 from pathlib import Path
+from time import perf_counter
+
+from dotenv import load_dotenv
 from pandas import DataFrame as Df
 
-load_dotenv()
+from db_engines import WH_DB as DB
+from logging_setup import HDLR
+
+START = perf_counter()
+load_dotenv('./.env')
+load_dotenv('../.env')
+
+CWD = Path().cwd()
+chdir(os_environ['APP_PATH'])
+
+config = configparser.ConfigParser()
+config.read('.conf')
+config.read('../app.conf')
+config.read('../conn.conf')
+
+LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
 
 # Unpack Config
-LOGGER = logging.getLogger(os_environ['PRMDIA_MM_LOGNAME'])
-CONFIG: dict[str, str|int] = json_loads(
+TBL_CONFIG: dict[str, str|int] = json_loads(
     Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())
 
-TBLNM: str = CONFIG['tblnm']
-ASTYPE: dict[str, str] = CONFIG['astype']
-PRE_SQL: list[str] = CONFIG['pre_sql']
+TBLNM: str = TBL_CONFIG['tblnm']
+ASTYPE: dict[str, str] = TBL_CONFIG['astype']
+PRE_SQL: list[str] = TBL_CONFIG['pre_sql']
 DF_KEY = 'map'
 
 def main():
     df = (
-        Df.from_dict(CONFIG[DF_KEY])
+        Df.from_dict(TBL_CONFIG[DF_KEY])
         .convert_dtypes()
         .astype(ASTYPE)
     )
@@ -41,6 +58,13 @@ def main():
 
     return
 
-# %%
 if __name__ == "__main__":
-    main()
+    try:
+        LOGGER.addHandler(HDLR)
+        LOGGER.setLevel(logging.DEBUG)
+        main()
+    finally:
+        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+        HDLR.close()
+
+chdir(CWD)
