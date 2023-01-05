@@ -126,17 +126,14 @@ def log_test(file_lvl=logging.DEBUG, stream_lvl=logging.WARNING):
             print(*l, sep=' | ')
     except Exception:
         LOGGER.debug(traceback.format_exc())
+        return
     finally:
         for hdlr in (HDLR_FILE, HDLR):
             hdlr.close()
-        return
 
 
 if __name__ == "__main__":
-    try:
-        Path(LOG_FILE_NAME).write_text(f"{LOG_FMT_FILE}\n", encoding='utf-8')
-        log_test()
-    finally:
-        HDLR.close()
+    Path(LOG_FILE_NAME).write_text(f"{LOG_FMT_FILE}\n", encoding='utf-8')
+    log_test()
 
 chdir(CDW)
