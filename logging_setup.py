@@ -43,17 +43,18 @@ LOG_ATTR_PTN = r'[%\(\[\]]|\)[sd]'
 #   that's unlikely to appear in a log message.
 LOG_DELIM_FILE = '|'
 LOG_NEWLINE_FILE = '==>>'
+
 LOG_FMT_FILE = (
-    '%(asctime)s'
-    + f"{LOG_DELIM_FILE}%(name)s"
-    + f"{LOG_DELIM_FILE}%(module)s"
-    + f"{LOG_DELIM_FILE}%(process)d"
-    + f"{LOG_DELIM_FILE}%(thread)d"
-    + f"{LOG_DELIM_FILE}%(funcName)s"
-    + f"{LOG_DELIM_FILE}[%(levelname)s]"
-    + f"{LOG_DELIM_FILE}%(message)s"
-    + f"{LOG_NEWLINE_FILE}"
-)
+                '%(asctime)s{dlm}'
+                + '%(name)s{dlm}'
+                + '%(module)s{dlm}'
+                + '%(process)d{dlm}'
+                + '%(thread)d{dlm}'
+                + '%(funcName)s{dlm}'
+                + '[%(levelname)s]{dlm}'
+                + '%(message)s{lnf}'
+                ).format(dlm=LOG_DELIM_FILE,
+                         lnf=LOG_NEWLINE_FILE)
 
 LOG_FMT_STRM = (
     '{prf}%(asctime)s - %(name)s | '
