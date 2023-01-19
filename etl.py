@@ -1,21 +1,17 @@
-"""
-Used to extrack data from ATT and AnswerFirst reporting files in
-    the lake repos and load to data sink DB for production.
-"""
+"""Used to extrack data from ATT and AnswerFirst reporting files in
+    the lake repos and load to data sink DB for production."""
 import configparser
 import logging
 import traceback
 from datetime import datetime, timedelta
 from os import chdir
 from os import environ as os_environ
-from os import system as os_system
 from pathlib import Path
-from sys import stdout
 from threading import Thread
 from time import perf_counter
 
-import dotenv
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 # For verifying DB updates.
 from db_engines import RPRT_DB
@@ -55,7 +51,7 @@ REPOS_PATH = Path(os_environ['LOCAL_STORAGE'])
 
 TODAY: str = datetime.now().strftime(QUERY_DATE_FMT)
 # Command to restore views after the table truncate inserts.
-XTRA_SQL = Path('billables_views.sql').read_text()
+XTRA_SQL = text(Path('billables_views.sql').read_text(encoding='utf-8'))
 
 AF_GLOB: str = AF_CFGS['src_label']
 ATT_GLOB: str = ATT_FILE_CFG['src_label']
@@ -65,7 +61,7 @@ REPO_CHECK_RNG = 5
 LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
 
-def db_connection_check():
+def _db_connection_check():
     """Checks for active database connection. If the query is
         unsuccessful, we bail on executing
         the module.
@@ -73,18 +69,20 @@ def db_connection_check():
     Raises:
         Exception: If the query is unsuccessful.
     """
-    for d in DB, RPRT_DB:
+    for db_ in DB, RPRT_DB:
         try:
-            check_connection(d)
-        except MySQL_OpErr:
-            logging.error(f"Bad Connection\n{traceback.format_exc}")
-            raise Exception(f"SEE BELOW/ABOVE")
+            check_connection(db_)
+        except MySQL_OpErr as exc:
+            trcbck = traceback.format_exc()
+            logging.error('Bad Connection on:\n%s', db_.engine)
+            logging.error('See traceback below:')
+            logging.debug(trcbck)
+            raise exc
         else:
             pass
-    return
 
 
-def check_repo_vintages():
+def _check_repo_vintages():
     """Checks vintages of <RNG> most recent files in the lake repository.
         Prints log messages which are color coded based on recency so
         the user can quickly check whether daily reports subscriptions
@@ -122,42 +120,40 @@ def check_repo_vintages():
             clr = good_ansi if (now - mtime_ < dlt) else bad_ansi
             del now, dlt
 
-            LOGGER.info(rpo_chk_prstr.format(
-                an=clr, anr=ansi_rst, nm=name_, ds=mtime_, ts=tmst))
-    return
+            log_msg = rpo_chk_prstr.format(
+                an=clr, anr=ansi_rst, nm=name_, ds=mtime_, ts=tmst)
+            LOGGER.info(log_msg)
 
 
 def main():
-    db_connection_check()
-    check_repo_vintages()
+    """Used to extrack data from ATT and AnswerFirst reporting files in
+        the lake repos and load to data sink DB for production."""
+    _db_connection_check()
+    _check_repo_vintages()
 
     att_thr = Thread(target=att)
     af_thr = Thread(target=af)
     client_thr = Thread(target=client)
     inhouse_thr = Thread(target=inhouse)
-    
-    threads: tuple[Thread,...] = (
+
+    jobs: tuple[Thread,...] = (
         af_thr,
         att_thr,
         client_thr,
         inhouse_thr,
     )
 
-    for t in threads:
-        t.start()
+    for job in jobs:
+        job.start()
 
-    for t in threads:
-        t.join()
+    for job in jobs:
+        job.join()
 
     # Re-instate views after truncate-inserts.
     #   (which involve DROP ... <table|view> CASCADE queries).
-    LOGGER.info(
-        f"Re-instating SQL views (replacing after 'DROP ... CASCADE' preparation queries)."
-    )
-    with DB.connect() as conn:
-        conn.execute(XTRA_SQL)
-
-    return
+    LOGGER.info('%s', 'Re-instating SQL views (replacing after '
+                      + '"DROP ... CASCADE" preparation queries).')
+    DB.execute(XTRA_SQL)
 
 
 if __name__ == "__main__":
@@ -167,7 +163,8 @@ if __name__ == "__main__":
         LOGGER.setLevel(logging.INFO)
         main()
     finally:
-        LOGGER.debug(f"Run duration: {perf_counter() - PERF_START :.4f}")
+        LOGGER.debug('Run duration: %s',
+                     f"{perf_counter() - PERF_START :.4f}")
         for h in HDLR_STRM, HDLR_STRM:
             h.close()
 
