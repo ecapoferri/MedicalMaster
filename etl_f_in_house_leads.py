@@ -14,29 +14,29 @@ from pandas import DataFrame as Df
 from pandas import Series as Ser
 
 from db_engines import WH_DB as DB
-from logging_setup import HDLR
+from logging_setup import HDLR_STRM
 from table_config import CALLERID_FLDNM
 from table_config import INHOUSE_LEAD_DATE_FLDNM as DATE_FLDNM
 from table_config import INHOUSE_LEADS_CFGS as CFGS
 from table_config import INHOUSE_LEADS_TIMESTAMP_FLDNM as TIMESTAMP_FLDNM
 
-START = perf_counter()
+PERF_START = perf_counter()
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
+load_dotenv(ROOT_PATH / '.env')
 
-load_dotenv('./.env')
-load_dotenv('../.env')
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'conn.conf')
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
-
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
-config.read('../conn.conf')
-
-LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 CLIENT_KEY: dict = json.loads(
-    Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH']).read_text())['map']
+    Path(conf['INTERNAL_RESOURCES']['MM_CLIENT_MAP_PTH']).read_text())['map']
 CLIENT_KEY_USECOLS: list[str] = ['practice_id', 'lead_email_form']
 
 BQ_SQL = CFGS['src_label']
@@ -45,7 +45,7 @@ DTYPE = CFGS['dtype']
 TBLNM = CFGS['tblnm']
 PRE_SQL = CFGS['pre_sql']
 
-LOGGER = logging.getLogger(f"{os_environ['PRMDIA_MM_LOGNAME']}")
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
 
 def extract_bq(query: str) -> Df:
@@ -115,11 +115,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        LOGGER.addHandler(HDLR)
+        LOGGER.addHandler(HDLR_STRM)
         LOGGER.setLevel(logging.DEBUG)
         main()
     finally:
-        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
-        HDLR.close()
+        LOGGER.debug(f"Run duration: {perf_counter() - PERF_START :.4f}")
+        HDLR_STRM.close()
 
-chdir(CWD)
+chdir(CALLING_DIR)

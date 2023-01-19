@@ -1,7 +1,7 @@
 import configparser
 import traceback
 from datetime import datetime
-from logging import Logger, debug, error, getLogger, info
+import logging
 from os import chdir
 from os import environ as os_environ
 from pathlib import Path
@@ -16,38 +16,40 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine  # for type hints
 from sqlalchemy.types import TypeEngine
 
+PERF_STRT = perf_counter()
 
-START = perf_counter()
-load_dotenv('./.env')
-load_dotenv('../.env')
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
+load_dotenv(ROOT_PATH / '.env')
 
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
-config.read('../conn.conf')
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'conn.conf')
 
-LOGGER = getLogger(config['DEFAULT']['LOGGER_NAME'])
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
-VNTGE_FMT = config['PM']['VNTGE_FMT']
+VNTGE_FMT = conf['PM']['VNTGE_FMT']
 
 #Destination WH DB Connection config/s================================>
-WH_PORT = config['PGSQL']['PORT']
+WH_PORT = conf['PGSQL']['PORT']
 WH_UN = os_environ['PRMDIA_POSTGRES_CONT_UN']
 WH_PW = os_environ['PRMDIA_POSTGRES_CONT_PW']
-WH_HOST = config['PGSQL']['HOST']
-WH_DB_NAME = config['PGSQL']['MM_DB']
-WH_DB_NAME_RPRT = config['PGSQL']['MM_DB']
+WH_HOST = conf['PGSQL']['HOST']
+WH_DB_NAME = conf['PGSQL']['MM_DB']
+WH_DB_NAME_RPRT = conf['PGSQL']['MM_DB']
 #<==Destination WH DB Connection config/s=========================<
 
 #MMS/WO=MySQL config/s================================>
 MMSWO_UN = os_environ['PRMDIA_SRVR_UN']
 MMSWO_PW = os_environ['PRMDIA_SRVR_PW']
-MMSWO_PORT = config['MYSQL']['PORT']
-MMSWO_HOST = config['MYSQL']['HOST']
-MMS_DB_NAME = config['MYSQL']['MMS_DB']
+MMSWO_PORT = conf['MYSQL']['PORT']
+MMSWO_HOST = conf['MYSQL']['HOST']
+MMS_DB_NAME = conf['MYSQL']['MMS_DB']
 #<==MMS/WO=MySQL config/s=========================<
 
 #==Connection Engines=============================>
@@ -160,4 +162,4 @@ def vintage_check(path_: str | Path) -> tuple[datetime | str]:
 
     return (dt, dt.strftime(VNTGE_FMT))
 
-chdir(CWD)
+chdir(CALLING_DIR)

@@ -135,6 +135,9 @@ GROUP BY
 DROP VIEW IF EXISTS gather_billables_all CASCADE;
 -- Shows all billables, including those imported from the old medical master.
 CREATE OR REPLACE VIEW gather_billables_all AS
+    -- This is old billables, the limit date here and the min date for the next
+    --  part of the union is where the cutoff for historical data and new data
+    --  will be. They should be the same. STODO: ome day I'll figure out session variables.
     SELECT
         af_acct,
         lead_delivery_date,

@@ -14,18 +14,20 @@ from sqlalchemy.dialects.postgresql import (BIGINT, BOOLEAN, DATE, ENUM,
                                             VARCHAR)
 from sqlalchemy.types import TypeEngine
 
-START = perf_counter()
-load_dotenv('./.env')
-load_dotenv('../.env')
+PERF_START = perf_counter()
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
+load_dotenv(ROOT_PATH / '.env')
 
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
 
-LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 # custom types aliased for easy for name hints
 AsType = NewType('PandasAsType | StypeStr', [type | str])
 DType = NewType('SQLAlchemyDType', TypeEngine)
@@ -107,7 +109,7 @@ ENUM_SQL = """
         DROP TYPE IF EXISTS {} CASCADE;
     """
 
-VNTGE_FMT: str = config['PM']['VNTGE_FMT']
+VNTGE_FMT: str = conf['PM']['VNTGE_FMT']
 
 
 # ATT - for a simple query to mms
@@ -275,9 +277,9 @@ AF_TBLNM = 'af_message_data'
 AF_CFGS = TblCfg(
     # for glob or regex
     src_label=(
-        config['ANSWER_FIRST']['AF_FILE_LABEL']
+        conf['ANSWER_FIRST']['AF_FILE_LABEL']
         + '*'
-        + config['ANSWER_FIRST']['AF_FILE_EXT']
+        + conf['ANSWER_FIRST']['AF_FILE_EXT']
     ),
     tblnm=AF_TBLNM,
     fields=AF_FIELDS,
@@ -522,5 +524,5 @@ INHOUSE_LEADS_CFGS = TblCfg(
         .replace('--sql ', '')
     ],
 )
-chdir(CWD)
-LOGGER.debug(f"{__name__} execution time: {START - perf_counter():.4f}")
+chdir(CALLING_DIR)
+LOGGER.debug(f"{__name__} execution time: {perf_counter() - PERF_START:.4f}")

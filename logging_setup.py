@@ -13,20 +13,19 @@ import numpy as np
 import numpy.typing as npt
 from dotenv import load_dotenv
 
-START = perf_counter()
+PERF_START = perf_counter()
+CALLER_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_DailyRprtETL'
+chdir(APP_PATH)
 
-load_dotenv('./.env')
-load_dotenv('../.env')
+load_dotenv(ROOT_PATH / '.env')
 
-CDW = Path().cwd()
-chdir(os_environ['APP_PATH'])
+conf = configparser.ConfigParser()
+conf.read('.conf')
 
-config = configparser.ConfigParser()
-config.read('.conf')
-
-
-# TOP_LOGGER_NAME = os_environ['PRMDIA_LOGGER_NAME']
-TOP_LOGGER_NAME = config['DEFAULT']['LOGGER_NAME']
+TOP_LOGGER_NAME = conf['DEFAULT']['LOGGER_NAME']
 
 ANSI = '\x1b[{clr}m'
 YLLW_ANSI = ANSI.format(clr='93')
@@ -63,14 +62,14 @@ LOG_FMT_STRM = (
     + '{lvl}{bld}[%(levelname)s] » {rst}{rst}%(message)s'
 ).format(prf=ANSI_LOG_PRFX, rst=ANSI_RST, lvl=YLLW_ANSI, bld='\x1b[1m')
 
-HDLR = logging.StreamHandler(stdout)
-HDLR.setFormatter(logging.Formatter(LOG_FMT_STRM, LOG_FMT_DATE_STRM))
+HDLR_STRM = logging.StreamHandler(stdout)
+HDLR_STRM.setFormatter(logging.Formatter(LOG_FMT_STRM, LOG_FMT_DATE_STRM))
 
 LOG_FILE_NAME = f"{TOP_LOGGER_NAME}.log"
 # File is overwritten when the module is run alone (__name__ = main).
 HDLR_FILE = logging.FileHandler(
     filename=LOG_FILE_NAME, mode='a', encoding='utf-8')
-
+HDLR_FILE.setLevel(logging.DEBUG)
 HDLR_FILE.setFormatter(
     logging.Formatter(fmt=LOG_FMT_FILE, datefmt=LOG_FMT_DATE_FILE))
 
@@ -102,13 +101,13 @@ def log_test(file_lvl=logging.DEBUG, stream_lvl=logging.WARNING):
         LOGGER = logging.getLogger('log_test')
 
         HDLR_FILE.setLevel(file_lvl)
-        HDLR.setLevel(stream_lvl)
+        HDLR_STRM.setLevel(stream_lvl)
 
         stream_level_str =\
-            f"\nStream Handler Level: {level_list[HDLR.level]}"
+            f"\nStream Handler Level: {level_list[HDLR_STRM.level]}"
         file_level_str = f"File Handler Level: {level_list[HDLR_FILE.level]}"
 
-        for hdlr in (HDLR_FILE, HDLR):
+        for hdlr in (HDLR_FILE, HDLR_STRM):
             LOGGER.addHandler(hdlr=hdlr)
         LOGGER.setLevel(logging.DEBUG)
 
@@ -128,7 +127,7 @@ def log_test(file_lvl=logging.DEBUG, stream_lvl=logging.WARNING):
         LOGGER.debug(traceback.format_exc())
         return
     finally:
-        for hdlr in (HDLR_FILE, HDLR):
+        for hdlr in (HDLR_FILE, HDLR_STRM):
             hdlr.close()
 
 
@@ -136,4 +135,4 @@ if __name__ == "__main__":
     Path(LOG_FILE_NAME).write_text(f"{LOG_FMT_FILE}\n", encoding='utf-8')
     log_test()
 
-chdir(CDW)
+chdir(CALLER_DIR)

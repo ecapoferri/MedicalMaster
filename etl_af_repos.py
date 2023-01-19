@@ -17,27 +17,29 @@ from sqlalchemy.types import TypeEngine
 
 from db_engines import WH_DB as DB
 from db_engines import db_load
-from logging_setup import HDLR
+from logging_setup import HDLR_STRM
 from table_config import (AF_CFGS, DATE_OUT_FLDNM, ENUM_SQL, VNTGE_FMT,
                           VNTGE_VW_SQL)
 
-START = perf_counter()
-load_dotenv('./.env')
-load_dotenv('../.env')
+PERF_START = perf_counter()
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
+load_dotenv(ROOT_PATH / '.env')
 
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
-config.read('../conn.conf')
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'conn.conf')
 
-LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
-VNTGE_FMT = config['PM']['VNTGE_FMT']
+VNTGE_FMT = conf['PM']['VNTGE_FMT']
 
-REPOS_PATH = Path(config['PM']['LOCAL_STORAGE'])
+REPOS_PATH = Path(os_environ['LOCAL_STORAGE'])
 
 SKIPHEAD: int = AF_CFGS['skiphead']
 RENAME: dict[str, str] = AF_CFGS['rename']
@@ -57,7 +59,7 @@ VNTGE_VW: str = AF_CFGS['vintage_view_nm']
 ENUMS: dict[str, str] = AF_CFGS['other_']['enums']
 PRE_SQL: list[str] = AF_CFGS['pre_sql']
 
-LOGGER = logging.getLogger(f"{config['DEFAULT']['LOGGER_NAME']}")
+LOGGER = logging.getLogger(f"{conf['DEFAULT']['LOGGER_NAME']}")
 
 def data_vintage_timestamp(paths: list[Path]) -> str:
     timestamp_lst: list[float] = [
@@ -194,11 +196,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        LOGGER.addHandler(HDLR)
+        LOGGER.addHandler(HDLR_STRM)
         LOGGER.setLevel(logging.DEBUG)
         main()
     finally:
-        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
-        HDLR.close()
+        LOGGER.debug(f"Run duration: {perf_counter() - PERF_START :.4f}")
+        HDLR_STRM.close()
 
-chdir(CWD)
+chdir(CALLING_DIR)

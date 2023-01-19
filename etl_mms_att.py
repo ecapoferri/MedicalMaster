@@ -14,24 +14,27 @@ from dotenv import load_dotenv
 from pandas import DataFrame as Df
 
 from db_engines import mms_db, wh_db
-from logging_setup import HDLR
+from logging_setup import HDLR_STRM
 from table_config import ATT_CFGS, TRAILING_DAYS, VNTGE_FMT, VNTGE_VW_SQL
 from time import perf_counter
 from pathlib import Path
 
-START = perf_counter()
-load_dotenv('./.env')
-load_dotenv('../.env')
+PERF_START = perf_counter()
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
 
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
-config.read('../conn.conf')
+load_dotenv(ROOT_PATH / '.env')
 
-LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'conn.conf')
+
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
 
 # CONFIGS

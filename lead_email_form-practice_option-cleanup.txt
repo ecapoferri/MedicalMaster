@@ -39,3 +39,7 @@ Indy Med Group
 Northwell Medical
 Orange Wellness
 Lake Norman Laser Pain
+Ally Spine Center
+Northeast Spine &amp; Wellness Center
+Philadelphia Laser Pain Center
+  </select>

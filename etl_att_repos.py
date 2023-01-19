@@ -19,25 +19,26 @@ from sqlalchemy.types import TypeEngine
 
 from db_engines import WH_DB as DB
 from db_engines import db_load
-from logging_setup import HDLR
+from logging_setup import HDLR_STRM
 from table_config import ATT_FILE_CFG, DATE_OUT_FLDNM, VNTGE_FMT, VNTGE_VW_SQL
 
-START = perf_counter()
+PERF_START = perf_counter()
+CALLING_DIR = Path().cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-load_dotenv('./.env')
-load_dotenv('../.env')
+load_dotenv(ROOT_PATH / '.env')
 
-CWD = Path().cwd()
-chdir(os_environ['APP_PATH'])
-
-config = configparser.ConfigParser()
-config.read('.conf')
-config.read('../app.conf')
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
 
 
-REPOS_PATH = config['PM']['LOCAL_STORAGE_REL_PATH']
+REPOS_PATH = os_environ['LOCAL_STORAGE']
 
-PHONE_PATH = config['INTERNAL_RESOURCES']['PHONE_MAP_FILE']
+PHONE_PATH = conf['INTERNAL_RESOURCES']['PHONE_MAP_FILE']
 
 USE_COLS: list[str | int] = ATT_FILE_CFG['use_cols']
 RENAME: dict[str, str] = ATT_FILE_CFG['rename']
@@ -80,7 +81,7 @@ PRESQL: list[str] = ATT_FILE_CFG['pre_sql']
 XTRASQL: list[str] = ATT_FILE_CFG['xtra_sql']
 VNTGE_VW: str = ATT_FILE_CFG['vintage_view_nm']
 
-LOGGER = logging.getLogger(config['DEFAULT']['LOGGER_NAME'])
+LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 
 def get_toll_map() -> dict:
     phone_path = Path(PHONE_PATH)
@@ -182,7 +183,7 @@ def clean(df__: Df):
 def main():
     path_list: list[Path] = list(Path(REPOS_PATH).rglob(FILE_RGLOB))
 
-    LOGGER = getLogger(f"{config['DEFAULT']['LOGGER_NAME']}")
+    LOGGER = getLogger(f"{conf['DEFAULT']['LOGGER_NAME']}")
 
     # get data vintage and append sql query to create view
     vntge: datetime = get_latest_vntge(path_list)
@@ -219,10 +220,10 @@ def main():
 
 if __name__ == "__main__":
     try:
-        LOGGER.addHandler(HDLR)
+        LOGGER.addHandler(HDLR_STRM)
         LOGGER.setLevel(logging.DEBUG)
         main()
     finally:
-        LOGGER.debug(f"Run duration: {perf_counter() - START:.4f}")
+        LOGGER.debug(f"Run duration: {perf_counter() - PERF_START :.4f}")
 
-chdir(CWD)
+chdir(CALLING_DIR)

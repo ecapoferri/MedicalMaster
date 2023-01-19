@@ -3,19 +3,29 @@ Translates the spreadsheet with client identifying values (name in AF,
     name in lead email form, AF practice id, etc) used to map identifiers
     to practice id.
 """
-import pandas as pd
-from pandas import Series as Ser, DataFrame as Df
-
+import configparser
+import json
+from os import chdir
+from os import environ as os_environ
 from pathlib import Path
 
-from os import environ as os_environ
+import pandas as pd
 from dotenv import load_dotenv
+from pandas import DataFrame as Df
 
-import json
+CALLING_DIR = Path.cwd()
+# Must be set in env on host/container.
+ROOT_PATH = Path(os_environ['APPS_ROOT'])
+APP_PATH = ROOT_PATH / 'PM_MedMaster'
+chdir(APP_PATH)
 
-load_dotenv()
+load_dotenv(ROOT_PATH / '.env')
 
-SRC_DIR = Path(os_environ['PRMDIA_MM_CLIENT_MAP_SRCPTH'])
+conf = configparser.ConfigParser()
+conf.read('.conf')
+conf.read(ROOT_PATH / 'app.conf')
+
+VNTGE_FMT = conf['PM']['VNTGE_FMT']
 
 AS_TYPE = {'astype': {
     'af_practice': 'string',
@@ -28,7 +38,8 @@ AS_TYPE = {'astype': {
     'lead_email_form': 'string',
 }}
 
-SRC_FN = 'AFDir.xlsx'
+SRC_DIR = Path(os_environ['LOCAL_STORAGE'])
+SRC_FN = conf['HOST_RESOURCES']['MM_CLIENT_MAP_FN']
 src_pth = SRC_DIR / SRC_FN
 
 USECOLS = [
@@ -49,22 +60,23 @@ CLIENT_MASTER_SHEET_NAME = 'master'
 
 PHONE_MAP_SHEET_NAME = 'phone_map'
 
-TBLNM = os_environ['PRMDIA_MM_CLIENT_MAP_TBLNM']
+TBLNM = conf['OUTPUT']['CLIENT_MAP_TBLNM']
 TBLNM_D: dict[str, str] = {'tblnm': TBLNM}
 
 PRE_SQL = {
     'pre_sql': [
         f"--sql DROP TABLE IF EXISTS {TBLNM} CASCADE".replace('--sql ', '')]}
 
-json_out = Path(os_environ['PRMDIA_MM_CLIENT_MAP_PTH'])
-phone_out = Path(os_environ['PRMDIA_MM_PHONE_MAP_PTH'])
+JSON_OUT = Path(conf['INTERNAL_RESOURCES']['MM_CLIENT_MAP_PTH'])
+PHONE_OUT = Path(conf['INTERNAL_RESOURCES']['PHONE_MAP_FILE'])
 
 
 def main():
-    xl = pd.ExcelFile(src_pth)
+    """TODO: DOCSTRING"""
+    xl_ = pd.ExcelFile(src_pth)
 
     client_map: Df = (
-        xl.parse(
+        xl_.parse(
             sheet_name=CLIENT_MASTER_SHEET_NAME,
             usecols=USECOLS
         )
@@ -73,25 +85,21 @@ def main():
     )
 
     # Remove pairs with NA values and load to dict.
-    map_ = {
-        col_key: {
-            idx: val for idx, val in col.items()
-            if pd.notna(val)
-        } for col_key, col in client_map.to_dict().items()
-    }
+    map_ = {col_key: {idx: val for idx, val in col.items()
+                      if pd.notna(val)}
+            for col_key, col in client_map.to_dict().items()}
 
     out_dict = TBLNM_D | AS_TYPE | PRE_SQL | {"map": map_}
 
-    json_out.write_text(json.dumps(obj=out_dict))
+    JSON_OUT.write_text(json.dumps(obj=out_dict), encoding='utf-8')
 
     # Parse toll number map and store to json.
     # TODO: May need to load to the db.
-    phone = xl.parse(sheet_name=PHONE_MAP_SHEET_NAME)
+    phone = xl_.parse(sheet_name=PHONE_MAP_SHEET_NAME)
     phone_dict = {k: v for v, k in phone.to_dict(orient='tight')['data']}
-    phone_out.write_text(json.dumps(obj=phone_dict))
-
-    return 
+    PHONE_OUT.write_text(json.dumps(obj=phone_dict), encoding='utf-8')
 
 
 if __name__ == "__main__":
     main()
+chdir(CALLING_DIR)
