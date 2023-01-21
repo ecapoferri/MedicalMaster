@@ -24,8 +24,8 @@ load_dotenv(ROOT_PATH / '.env')
 
 conf = configparser.ConfigParser()
 conf.read('.conf')
-conf.read(ROOT_PATH / 'app.conf')
-conf.read(ROOT_PATH / 'conn.conf')
+conf.read(ROOT_PATH / 'app.cfg')
+conf.read(ROOT_PATH / 'conn.cfg')
 
 LOGGER = logging.getLogger(conf['DEFAULT']['LOGGER_NAME'])
 

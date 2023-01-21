@@ -33,7 +33,7 @@ load_dotenv(ROOT_PATH / '.env')
 
 conf = configparser.ConfigParser()
 conf.read('.conf')
-conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'app.cfg')
 
 
 REPOS_PATH = os_environ['LOCAL_STORAGE']

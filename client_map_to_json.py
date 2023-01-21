@@ -23,7 +23,7 @@ load_dotenv(ROOT_PATH / '.env')
 
 conf = configparser.ConfigParser()
 conf.read('.conf')
-conf.read(ROOT_PATH / 'app.conf')
+conf.read(ROOT_PATH / 'app.cfg')
 
 VNTGE_FMT = conf['PM']['VNTGE_FMT']
 
